@@ -3,8 +3,8 @@
   "short_name": "MELDUNEK",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0A2540",
-  "theme_color": "#005F73",
+  "background_color": "#0f0f12",
+  "theme_color": "#0f0f12",
   "icons": [
     {
       "src": "icon.png",
@@ -13,4 +13,3 @@
     }
   ]
 }
-
