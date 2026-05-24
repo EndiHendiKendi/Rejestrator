@@ -680,7 +680,7 @@ function handleOcrFile(file){
 
     var prompt="Analyze this identity document image carefully. It may be a passport, national ID card, or driving license in ANY language (French, German, Italian, Polish, Swiss, etc).\n\nReturn ONLY a valid JSON object, absolutely no markdown, no backticks, no explanation:\n{\"lastName\":\"SURNAME as printed\",\"firstName\":\"Given name(s) as printed\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"country in Italian caps (SVIZZERA/FRANCE/GERMANY/POLAND/ITALIA etc)\",\"birthCountry\":\"country in Italian caps, same as nationality if not specified\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"document number exactly as printed\"}\n\nImportant rules:\n- Names: exactly as on document, keep original characters\n- Date: always DD/MM/YYYY format\n- Gender: M for male/masculin/männlich/maschio, F for female/féminin/weiblich/femmina\n- nationality: Italian-style (SVIZZERA not Switzerland, POLONIA not Poland, GERMANIA not Germany, FRANCIA not France, STATI UNITI not USA)\n- If a field is not visible: use empty string";
 
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+apiKey,{
+    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+apiKey,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
