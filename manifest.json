@@ -1,0 +1,16 @@
+{
+  "name": "MELDUNEK",
+  "short_name": "MELDUNEK",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0A2540",
+  "theme_color": "#005F73",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
