@@ -681,49 +681,89 @@ function handleOcrFile(file){
     var prompt="Analyze this identity document image carefully. It may be a passport, national ID card, or driving license in ANY language (French, German, Italian, Polish, Swiss, etc).\n\nReturn ONLY a valid JSON object, absolutely no markdown, no backticks, no explanation:\n{\"lastName\":\"SURNAME as printed\",\"firstName\":\"Given name(s) as printed\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"country in Italian caps (SVIZZERA/FRANCE/GERMANY/POLAND/ITALIA etc)\",\"birthCountry\":\"country in Italian caps, same as nationality if not specified\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"document number exactly as printed\"}\n\nImportant rules:\n- Names: exactly as on document, keep original characters\n- Date: always DD/MM/YYYY format\n- Gender: M for male/masculin/männlich/maschio, F for female/féminin/weiblich/femmina\n- nationality: Italian-style (SVIZZERA not Switzerland, POLONIA not Poland, GERMANIA not Germany, FRANCIA not France, STATI UNITI not USA)\n- If a field is not visible: use empty string";
 
     fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+apiKey,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        contents:[{parts:[
-          {inline_data:{mime_type:mt, data:b64}},
-          {text:prompt}
-        ]}],
-        generationConfig:{maxOutputTokens:400, temperature:0, responseMimeType:"application/json"}
-      })
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+        contents: [{
+            parts: [
+                {inlineData: {mime_type: mt, data: b64}},
+                {text: prompt}
+            ]
+        }],
+        generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0,
+            responseMimeType: "application/json",
+            // WYMUSZENIE STRUKTURY: Gemini wypluje TYLKO te klucze, których potrzebujesz
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    lastName: { type: "STRING" },
+                    firstName: { type: "STRING" },
+                    dateOfBirth: { type: "STRING" },
+                    nationality: { type: "STRING" },
+                    birthCountry: { type: "STRING" },
+                    docType: { type: "STRING" },
+                    docNumber: { type: "STRING" },
+                    gender: { type: "STRING" }
+                },
+                required: ["lastName", "firstName"]
+            }
+        },
+        // BLOKADA FILTRÓW: Zapobiega odrzucaniu zdjęć paszportów/dowodów przez AI
+        safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
     })
-    .then(function(r){
-      if(!r.ok){
+})
+.then(function(r){
+    if(!r.ok){
         return r.json().then(function(e){
-          throw new Error((e.error&&e.error.message)||"HTTP "+r.status);
+            throw new Error((e.error && e.error.message) || "HTTP " + r.status);
         });
-      }
-      return r.json();
-    })
-    .then(function(data){
-      document.getElementById("ocrStatus").style.display="none";
-      // Wyciągnij tekst z odpowiedzi Gemini
-      var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
-      var txt=parts.map(function(x){return x.text||"";}).join("").trim();
-      // Wyczyść ewentualne markdown
-      txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```\s*$/,"").trim();
-      // Znajdź JSON
-      var m=txt.match(/\{[\s\S]*\}/);
-      if(!m)throw new Error("Brak danych w odpowiedzi AI. Spróbuj z wyraźniejszym zdjęciem.");
-      var p=JSON.parse(m[0]);
+    }
+    return r.json();
+})
+.then(function(data){
+    document.getElementById("ocrStatus").style.display = "none";
+    
+    // Inteligentne sprawdzenie czy Google nie zablokowało skanu na poziomie serwera
+    if (data.candidates && data.candidates[0] && data.candidates[0].finishReason === "SAFETY") {
+        throw new Error("Google zablokowało skanowanie tego dokumentu ze względów prywatności. Spróbuj innego zdjęcia.");
+    }
 
-      document.getElementById("oLast").value=p.lastName||"";
-      document.getElementById("oFirst").value=p.firstName||"";
-      document.getElementById("oDob").value=p.dateOfBirth||"";
-      document.getElementById("oNat").value=p.nationality||"";
-      document.getElementById("oBirth").value=(p.birthCountry&&p.birthCountry!==p.nationality)?p.birthCountry:"";
-      document.getElementById("oResid").value="";
-      document.getElementById("oDocType").value=p.docType||"";
-      document.getElementById("oDocNum").value=p.docNumber||"";
-      setOcrGender(p.gender||"");
+    var parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+    var txt = parts.map(function(x){ return x.text || ""; }).join("").trim();
+    
+    if(!txt) {
+        throw new Error("Model zwrócił pustą odpowiedź. Spróbuj ponownie z wyraźniejszym kadrem.");
+    }
 
-      document.getElementById("ocrResult").style.display="block";
-      refreshOcrBtns();
-    })
+    // Wyciąganie czystego obiektu JSON
+    txt = txt.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/, "").trim();
+    var n = txt.match(/\{[\s\S]*\}/);
+    
+    if(!n) throw new Error("Brak danych w odpowiedzi AI. Spróbuj z wyraźniejszym zdjęciem.");
+    var p = JSON.parse(n[0]);
+
+    // Automatyczne i bezbłędne uzupełnianie Twojego formularza
+    document.getElementById("oLast").value = p.lastName || "";
+    document.getElementById("oFirst").value = p.firstName || "";
+    document.getElementById("oDob").value = p.dateOfBirth || "";
+    document.getElementById("oNat").value = p.nationality || "";
+    document.getElementById("oBirth").value = (p.birthCountry && p.birthCountry !== p.nationality) ? p.birthCountry : "";
+    document.getElementById("oResid").value = "";
+    document.getElementById("oDocType").value = p.docType || "";
+    document.getElementById("oDocNum").value = p.docNumber || "";
+    setOcrGender(p.gender || "");
+
+    document.getElementById("ocrResult").style.display = "block";
+    refreshOcrBtns();
+})
+      
     .catch(function(e){
       document.getElementById("ocrStatus").style.display="none";
       document.getElementById("ocrErr").style.display="block";
