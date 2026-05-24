@@ -1,15 +1,23 @@
 {
-  "name": "MELDUNEK",
-  "short_name": "MELDUNEK",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#0f0f12",
-  "theme_color": "#0f0f12",
+  "short_name": "Ross1000",
+  "name": "Ross1000 Check-in",
   "icons": [
     {
       "src": "icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.png",
+      "type": "image/png",
       "sizes": "512x512",
-      "type": "image/png"
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": ".",
+  "background_color": "#0f0f12",
+  "theme_color": "#0f0f12",
+  "display": "standalone",
+  "orientation": "portrait"
 }
