@@ -761,23 +761,42 @@ function applyOcr(guestId){
   var nat=document.getElementById("oNat").value;
   var birth=document.getElementById("oBirth").value||nat;
   var resid=document.getElementById("oResid").value||nat;
+
+  var natC = normC(nat);
+  var birthC = normC(birth);
+  var resC = normC(resid);
   
-  var up={lastName:san(document.getElementById("oLast").value),firstName:san(document.getElementById("oFirst").value),dob:parseDt(document.getElementById("oDob").value),gender:ocrGender,cit:normC(nat),birthC:normC(birth)||normC(nat),residC:normC(resid)||normC(nat),isItaly:isIT(nat),docType:document.getElementById("oDocType").value,docNumber:san(document.getElementById("oDocNum").value)};
+  // Poprawka: logiczne dopasowanie krajów i czyszczenie jeśli takie same
+  birthC = (birthC === natC) ? "" : birthC;
+  resC = (resC === natC) ? "" : resC;
+  
+  var isFirst = (guests.length === 0);
+  
+  var up={
+    lastName:san(document.getElementById("oLast").value),
+    firstName:san(document.getElementById("oFirst").value),
+    dob:parseDt(document.getElementById("oDob").value),
+    gender:ocrGender,
+    cit:natC,
+    birthC:birthC,
+    residC:resC,
+    isItaly:isIT(nat),
+    docType:isFirst ? document.getElementById("oDocType").value : "",
+    docNumber:isFirst ? san(document.getElementById("oDocNum").value) : ""
+  };
   
   if(guestId){
     for(var i=0;i<guests.length;i++){if(guests[i].id===guestId){Object.assign(guests[i],up);break;}}
   } else {
-    var isFirst=guests.length===0;
-    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:isFirst ? up.docNumber : "",role:isFirst?"Capogruppo":"Membro"});
+    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,role:isFirst?"Capogruppo":"Membro"});
   }
   
+  document.getElementById("ocrResult").style.display="none";
   document.getElementById("gotoLista").style.display="block";
   document.getElementById("btnGotoLista").textContent="Lista gości ("+guests.length+") →";
-  refreshOcrBtns();
-
+  
   // Kolejka
   if(ocrQueue.length > 0) {
-    document.getElementById("ocrResult").style.display="none";
     processOcrQueue();
   } else {
     document.getElementById("uploadZoneWrap").style.display="block";
@@ -836,11 +855,12 @@ function renderLista(){
       html+='</select>';
       html+='<input class="inp" data-gid="'+g.id+'" data-field="docNumber" value="'+(g.docNumber||"")+'" placeholder="Numero documento" style="letter-spacing:2px;font-family:\'SF Mono\',monospace;font-size:14px;text-transform:uppercase;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';" />';
       html+='</div>';
-      html += '<div style="margin-top:10px;display:flex;gap:10px;">' +
-        '<button onclick="editGuest(\''+g.id+'\')" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">✏️ Edytuj</button>' +
-        '<button onclick="removeGuest(\''+g.id+'\')" class="btn btn-danger" style="padding:4px 8px;font-size:12px;">🗑️ Usuń</button>' +
-        '</div>';
     }
+    // Przycisk edycji i usuwania dla KAŻDEGO
+    html += '<div style="margin-top:10px;display:flex;gap:10px;">' +
+      '<button onclick="editGuest(\''+g.id+'\')" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">✏️ Edytuj</button>' +
+      '<button onclick="removeGuest(\''+g.id+'\')" class="btn btn-danger" style="padding:4px 8px;font-size:12px;">🗑️ Usuń</button>' +
+      '</div>';
     html+='</div>';
   }
   document.getElementById("guestCards").innerHTML=html;
@@ -901,7 +921,7 @@ function renderExport(){
   var leader=null;for(var i=0;i<guests.length;i++){if(guests[i].isLeader){leader=guests[i];break;}}
   var hasErr=!arr||(leader&&(!leader.docType||!leader.docNumber));
   for(var i=0;i<guests.length;i++){if(!guests[i].dob)hasErr=true;}
-  document.getElementById("btnDownload").disabled=!!hasErr;
+  document.getElementById("btnGoExport").disabled=!!hasErr;
 }
 document.getElementById("btnDownload").addEventListener("click",function(){
   if(!guests.length)return;
