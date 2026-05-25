@@ -763,15 +763,7 @@ function runOcr(file,onDone){
 }
 
 function refreshOcrBtns(){
-  var d=document.getElementById("ocrGuestBtns");
-  if(!guests.length){d.innerHTML="";return;}
-  var html='<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;">lub aktualizuj:</div>';
-  for(var i=0;i<guests.length;i++){
-    html+='<button class="btn btn-secondary" style="margin-bottom:6px;text-align:left;font-size:13px;padding:11px 14px;" data-gid="'+guests[i].id+'">→ '+guests[i].lastName+' '+guests[i].firstName+' <span style="color:var(--text3);font-size:11px;">('+guests[i].role+')</span></button>';
   }
-  d.innerHTML=html;
-  d.querySelectorAll("[data-gid]").forEach(function(btn){btn.addEventListener("click",function(){applyOcr(this.getAttribute("data-gid"));});});
-}
 
 document.getElementById("btnOcrNew").addEventListener("click",function(){applyOcr(null);});
 
@@ -787,7 +779,7 @@ function applyOcr(guestId){
     for(var i=0;i<guests.length;i++){if(guests[i].id===guestId){Object.assign(guests[i],up);break;}}
   } else {
     var isFirst=guests.length===0;
-    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber||"",role:isFirst?"Capogruppo":"Membro"});
+    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:isFirst?up.docNumber||"",role:isFirst?"Capogruppo":"Membro"});
   }
   
   document.getElementById("gotoLista").style.display="block";
@@ -855,6 +847,10 @@ function renderLista(){
       html+='</select>';
       html+='<input class="inp" data-gid="'+g.id+'" data-field="docNumber" value="'+(g.docNumber||"")+'" placeholder="Numero documento" style="letter-spacing:2px;font-family:\'SF Mono\',monospace;font-size:14px;text-transform:uppercase;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';" />';
       html+='</div>';
+      html += '<div style="margin-top:10px;display:flex;gap:10px;">' +
+        '<button onclick="editGuest(\''+g.id+'\')" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">✏️ Edytuj</button>' +
+        '<button onclick="removeGuest(\''+g.id+'\')" class="btn btn-danger" style="padding:4px 8px;font-size:12px;">🗑️ Usuń</button>' +
+        '</div>';
     }
     html+='</div>';
   }
@@ -864,6 +860,21 @@ function renderLista(){
     el.addEventListener(ev,function(){var v=this.value;if(this.getAttribute("data-field")==="docNumber")v=v.toUpperCase();for(var i=0;i<guests.length;i++){if(guests[i].id===this.getAttribute("data-gid")){guests[i][this.getAttribute("data-field")]=v;break;}}renderLista();});
   });
 }
+  function removeGuest(id) {
+  guests = guests.filter(function(g){ return g.id !== id; });
+  renderLista();
+}
+
+function editGuest(id) {
+  var g = guests.find(function(x){ return x.id === id; });
+  document.getElementById("oLast").value = g.lastName;
+  document.getElementById("oFirst").value = g.firstName;
+  document.getElementById("oDob").value = g.dob;
+  document.getElementById("oDocType").value = g.docType;
+  document.getElementById("oDocNum").value = g.docNumber;
+  showScreen("skan");
+}
+
 document.getElementById("btnGoExport").addEventListener("click",function(){showScreen("eksport");});
 
 // ═══════════════════════════════════════
