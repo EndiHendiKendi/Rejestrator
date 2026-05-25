@@ -708,7 +708,7 @@ function runOcr(file,onDone){
     if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
     var prompt="Analyze this identity document. Return ONLY raw JSON, no markdown:\n{\"lastName\":\"SURNAME\",\"firstName\":\"Given name\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"Italian caps: SVIZZERA/FRANCE/GERMANY/POLAND/ITALIA/AUSTRIA/SPAIN/BELGIUM/NETHERLANDS/UNITED KINGDOM/USA etc\",\"birthCountry\":\"same format, empty if same as nationality\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact number\"}\nAll fields exactly as printed. Date always DD/MM/YYYY. Empty string if not visible.";
     
-    // Kaskada modeli: od najwyższej jakości ocr do największego limitu dziennego
+    // Kaskada modeli dostępnych na Twoim koncie
     var models = ["gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite"];
     var modelIndex = 0;
 
@@ -734,15 +734,17 @@ function runOcr(file,onDone){
         return r.json();
       })
       .then(function(data){
-        document.getElementById("ocrStatus").style.display="none";
-        if(data.candidates&&data.candidates[0]&&data.candidates[0].finishReason==="SAFETY")throw new Error("Gemini zablokowało skan. Spróbuj innego zdjęcia.");
+        if(data.candidates&&data.candidates[0]&&data.candidates[0].finishReason==="SAFETY") throw new Error("Blokada bezpieczeństwa");
         var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
         var txt=parts.map(function(x){return x.text||"";}).join("").trim();
-        if(!txt)throw new Error("Pusta odpowiedź AI.");
+        if(!txt) throw new Error("Pusta odpowiedź");
+        
         txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```$/,"").trim();
         var m=txt.match(/\{[\s\S]*\}/);
-        if(!m)throw new Error("Brak JSON w odpowiedzi.");
+        if(!m) throw new Error("Brak prawidłowej struktury danych");
+        
         var p=JSON.parse(m[0]);
+        document.getElementById("ocrStatus").style.display="none";
         document.getElementById("oLast").value=p.lastName||"";
         document.getElementById("oFirst").value=p.firstName||"";
         document.getElementById("oDob").value=p.dateOfBirth||"";
@@ -762,15 +764,17 @@ function runOcr(file,onDone){
       })
       .catch(function(err){
         var msg = err.message || "";
-        // Jeśli wykryto błąd limitów (429, quota lub RESOURCE_EXHAUSTED) i mamy kolejny model na liście
-        if ((msg.indexOf("429") >= 0 || msg.toLowerCase().indexOf("quota") >= 0 || msg.indexOf("RESOURCE_EXHAUSTED") >= 0) && modelIndex < models.length - 1) {
-          console.warn("Model " + currentModel + " wyczerpany. Przełączam na kolejny...");
+        console.warn("Model " + currentModel + " napotkał problem: " + msg);
+        
+        // Jeśli ten model zawiódł (z jakiegokolwiek powodu) i mamy następny na liście, przełączamy natychmiast
+        if (modelIndex < models.length - 1) {
           modelIndex++;
           attemptFetch();
         } else {
+          // Dopiero ostatni model na liście (gemini-3.1-flash-lite) wyrzuci trwały błąd na ekranie
           document.getElementById("ocrStatus").style.display="none";
           document.getElementById("ocrErr").style.display="block";
-          document.getElementById("ocrErr").innerHTML="✗ [" + currentModel + "] " + msg + '<br/><span style="font-size:12px;color:var(--text3);">Sprawdź klucz API w ustawieniach ⚙️</span>';
+          document.getElementById("ocrErr").innerHTML="✗ [" + currentModel + "] Ostateczny błąd: " + msg + '<br/><span style="font-size:12px;color:var(--text3);">Sprawdź zdjęcie lub klucz API ⚙️</span>';
           document.getElementById("uploadZoneWrap").style.display="block";
           onDone();
         }
