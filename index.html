@@ -700,7 +700,6 @@ function runOcr(file,onDone){
   document.getElementById("ocrQueueInfo").style.display="none";
   document.getElementById("ocrStatus").style.display="block";
   var st=document.getElementById("ocrStatusTxt");
-  if(st)st.textContent="Analizuję"+(ocrQueue.length>0?" ("+(ocrQueue.length+1)+" dokumentów)":"")+"...";
 
   var reader=new FileReader();
   reader.onload=function(e){
@@ -708,53 +707,81 @@ function runOcr(file,onDone){
     var mt=file.type||"image/jpeg";
     if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
     var prompt="Analyze this identity document. Return ONLY raw JSON, no markdown:\n{\"lastName\":\"SURNAME\",\"firstName\":\"Given name\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"Italian caps: SVIZZERA/FRANCE/GERMANY/POLAND/ITALIA/AUSTRIA/SPAIN/BELGIUM/NETHERLANDS/UNITED KINGDOM/USA etc\",\"birthCountry\":\"same format, empty if same as nationality\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact number\"}\nAll fields exactly as printed. Date always DD/MM/YYYY. Empty string if not visible.";
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+apiKey,{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        contents:[{parts:[{inlineData:{mime_type:mt,data:b64}},{text:prompt}]}],
-        generationConfig:{maxOutputTokens:400,temperature:0,responseMimeType:"application/json",
-        responseSchema:{type:"object",properties:{lastName:{type:"string"},firstName:{type:"string"},dateOfBirth:{type:"string"},nationality:{type:"string"},birthCountry:{type:"string"},docType:{type:"string"},docNumber:{type:"string"},gender:{type:"string"}},required:["lastName","firstName"]}},
-        safetySettings:[{category:"HARM_CATEGORY_HARASSMENT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_HATE_SPEECH",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_SEXUALLY_EXPLICIT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_NONE"}]
+    
+    // Kaskada modeli: od najwyższej jakości ocr do największego limitu dziennego
+    var models = ["gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite"];
+    var modelIndex = 0;
+
+    function attemptFetch() {
+      var currentModel = models[modelIndex];
+      if(st) st.textContent = "Analizuję (" + currentModel + ")" + (ocrQueue.length > 0 ? " [" + (ocrQueue.length + 1) + "]" : "") + "...";
+
+      fetch("https://generativelanguage.googleapis.com/v1beta/models/" + currentModel + ":generateContent?key=" + apiKey, {
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          contents:[{parts:[{inlineData:{mime_type:mt,data:b64}},{text:prompt}]}],
+          generationConfig:{maxOutputTokens:400,temperature:0,responseMimeType:"application/json",
+            responseSchema:{type:"OBJECT",properties:{lastName:{type:"STRING"},firstName:{type:"STRING"},dateOfBirth:{type:"STRING"},nationality:{type:"STRING"},birthCountry:{type:"STRING"},docType:{type:"STRING"},docNumber:{type:"STRING"},gender:{type:"STRING"}},required:["lastName","firstName"]}},
+          safetySettings:[{category:"HARM_CATEGORY_HARASSMENT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_HATE_SPEECH",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_SEXUALLY_EXPLICIT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_NONE"}]
+        })
       })
-    })
-    .then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error((e.error&&e.error.message)||"HTTP "+r.status);});return r.json();})
-    .then(function(data){
-      document.getElementById("ocrStatus").style.display="none";
-      if(data.candidates&&data.candidates[0]&&data.candidates[0].finishReason==="SAFETY")throw new Error("Gemini zablokowało skan. Spróbuj innego zdjęcia.");
-      var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
-      var txt=parts.map(function(x){return x.text||"";}).join("").trim();
-      if(!txt)throw new Error("Pusta odpowiedź AI.");
-      txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```$/,"").trim();
-      var m=txt.match(/\{[\s\S]*\}/);
-      if(!m)throw new Error("Brak JSON w odpowiedzi.");
-      var p=JSON.parse(m[0]);
-      document.getElementById("oLast").value=p.lastName||"";
-      document.getElementById("oFirst").value=p.firstName||"";
-      document.getElementById("oDob").value=p.dateOfBirth||"";
-      document.getElementById("oNat").value=p.nationality||"";
-      document.getElementById("oBirth").value=(p.birthCountry&&p.birthCountry!==p.nationality)?p.birthCountry:"";
-      document.getElementById("oResid").value="";
-      document.getElementById("oDocType").value=p.docType||"";
-      document.getElementById("oDocNum").value=p.docNumber||"";
-      setOcrGender(p.gender||"");
-      document.getElementById("ocrResult").style.display="block";
-      if(ocrQueue.length>0){
-        document.getElementById("ocrQueueInfo").style.display="block";
-        document.getElementById("ocrQueueInfo").textContent="✓ Gotowe. Zastosuj poniżej — kolejny skan startuje automatycznie ("+ocrQueue.length+" pozostało)";
-      }
-      refreshOcrBtns();
-      onDone();
-    })
-    .catch(function(err){
-      document.getElementById("ocrStatus").style.display="none";
-      document.getElementById("ocrErr").style.display="block";
-      document.getElementById("ocrErr").innerHTML="✗ "+err.message+'<br/><span style="font-size:12px;color:var(--text3);">Sprawdź klucz API w ustawieniach ⚙️</span>';
-      document.getElementById("uploadZoneWrap").style.display="block";
-      onDone();
-    });
+      .then(function(r){
+        if(!r.ok) {
+          return r.json().then(function(e){
+            throw new Error((e.error && e.error.message) || "HTTP " + r.status);
+          });
+        }
+        return r.json();
+      })
+      .then(function(data){
+        document.getElementById("ocrStatus").style.display="none";
+        if(data.candidates&&data.candidates[0]&&data.candidates[0].finishReason==="SAFETY")throw new Error("Gemini zablokowało skan. Spróbuj innego zdjęcia.");
+        var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+        var txt=parts.map(function(x){return x.text||"";}).join("").trim();
+        if(!txt)throw new Error("Pusta odpowiedź AI.");
+        txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```$/,"").trim();
+        var m=txt.match(/\{[\s\S]*\}/);
+        if(!m)throw new Error("Brak JSON w odpowiedzi.");
+        var p=JSON.parse(m[0]);
+        document.getElementById("oLast").value=p.lastName||"";
+        document.getElementById("oFirst").value=p.firstName||"";
+        document.getElementById("oDob").value=p.dateOfBirth||"";
+        document.getElementById("oNat").value=p.nationality||"";
+        document.getElementById("oBirth").value=(p.birthCountry&&p.birthCountry!==p.nationality)?p.birthCountry:"";
+        document.getElementById("oResid").value="";
+        document.getElementById("oDocType").value=p.docType||"";
+        document.getElementById("oDocNum").value=p.docNumber||"";
+        setOcrGender(p.gender||"");
+        document.getElementById("ocrResult").style.display="block";
+        if(ocrQueue.length>0){
+          document.getElementById("ocrQueueInfo").style.display="block";
+          document.getElementById("ocrQueueInfo").textContent="✓ Gotowe. Zastosuj poniżej — kolejny skan startuje automatycznie ("+ocrQueue.length+" pozostało)";
+        }
+        refreshOcrBtns();
+        onDone();
+      })
+      .catch(function(err){
+        var msg = err.message || "";
+        // Jeśli wykryto błąd limitów (429, quota lub RESOURCE_EXHAUSTED) i mamy kolejny model na liście
+        if ((msg.indexOf("429") >= 0 || msg.toLowerCase().indexOf("quota") >= 0 || msg.indexOf("RESOURCE_EXHAUSTED") >= 0) && modelIndex < models.length - 1) {
+          console.warn("Model " + currentModel + " wyczerpany. Przełączam na kolejny...");
+          modelIndex++;
+          attemptFetch();
+        } else {
+          document.getElementById("ocrStatus").style.display="none";
+          document.getElementById("ocrErr").style.display="block";
+          document.getElementById("ocrErr").innerHTML="✗ [" + currentModel + "] " + msg + '<br/><span style="font-size:12px;color:var(--text3);">Sprawdź klucz API w ustawieniach ⚙️</span>';
+          document.getElementById("uploadZoneWrap").style.display="block";
+          onDone();
+        }
+      });
+    }
+
+    attemptFetch();
   };
   reader.readAsDataURL(file);
 }
+
 
 function refreshOcrBtns(){
   var d=document.getElementById("ocrGuestBtns");
