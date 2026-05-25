@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Meldunek"/>
 <meta name="theme-color" content="#0a0a0f"/>
 <title>Meldunek</title>
+  <link rel="manifest" href="manifest.json">
 <style>
 /* ── RESET & BASE ── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -897,6 +898,19 @@ document.getElementById("btnDownload").addEventListener("click",function(){
 document.getElementById("inpArr").value=todayStr();
 recalcDep();
 updateKeyStatus();
+</script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js')
+      .then(function(registration) {
+        console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
+      })
+      .catch(function(error) {
+        console.log('Błąd rejestracji Service Workera:', error);
+      });
+  });
+}
 </script>
 </body>
 </html>
