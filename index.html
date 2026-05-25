@@ -661,7 +661,6 @@ document.getElementById("btnProcess").addEventListener("click",function(){
   showScreen("lista");
 });
 
-
 // ═══════════════════════════════════════
 // OCR — QUEUE
 // ═══════════════════════════════════════
@@ -679,17 +678,17 @@ document.getElementById("oDocNum").addEventListener("input",function(){this.valu
 
 function processOcrQueue(){
   if(ocrProcessing||!ocrQueue.length)return;
-  ocrProcessing=false; // Reset flagi, aby runOcr mogło przejąć kontrolę
+  ocrProcessing=true; // Ustawiamy flagę
   var file=ocrQueue.shift();
   runOcr(file,function(){
-    // Callback wykonuje się dopiero po pełnym zakończeniu przetwarzania
+    ocrProcessing=false;
   });
 }
 
 function addToQueue(files){
   for(var i=0;i<files.length;i++)ocrQueue.push(files[i]);
   document.getElementById("uploadZoneWrap").style.display="none";
-  if(!document.getElementById("ocrResult").style.display || document.getElementById("ocrResult").style.display === "none") {
+  if(!ocrProcessing) {
     processOcrQueue();
   }
 }
@@ -698,7 +697,7 @@ function runOcr(file,onDone){
   var apiKey=getApiKey();
   if(!apiKey){openSettings();onDone();return;}
   
-  // Czyszczenie pól przed nowym skanem, żeby stare dane nie wisiały w formularzu
+  // Reset pól
   document.getElementById("oLast").value="";
   document.getElementById("oFirst").value="";
   document.getElementById("oDob").value="";
@@ -711,10 +710,8 @@ function runOcr(file,onDone){
 
   document.getElementById("ocrResult").style.display="none";
   document.getElementById("ocrErr").style.display="none";
-  document.getElementById("ocrQueueInfo").style.display="none";
   document.getElementById("ocrStatus").style.display="block";
-  var st=document.getElementById("ocrStatusTxt");
-  if(st)st.textContent="Analizuję dokument"+(ocrQueue.length > 0 ? " (Pozostało w kolejce: "+ocrQueue.length+")" : "")+"...";
+  document.getElementById("ocrStatusTxt").textContent="Analizuję...";
 
   var reader=new FileReader();
   reader.onload=function(e){
@@ -722,64 +719,43 @@ function runOcr(file,onDone){
     var mt=file.type||"image/jpeg";
     if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
     
-    // Zaktualizowany prompt: Zmuszamy Gemini do dedukcji płci po imieniu, jeśli jej nie ma
-    var prompt="Analyze this identity document. Return ONLY raw JSON, no markdown:\n" +
-      "{\"lastName\":\"SURNAME\",\"firstName\":\"Given name\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"Italian caps: SVIZZERA/FRANCE/GERMANY/POLAND/ITALIA/AUSTRIA/SPAIN/BELGIUM/NETHERLANDS/UNITED KINGDOM/USA etc\",\"birthCountry\":\"same format, empty if same as nationality\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact number\"}\n" +
-      "All fields exactly as printed. Date always DD/MM/YYYY. CRITICAL: If the document does not explicitly contain a gender field, determine the gender ('M' or 'F') by analyzing the given name (firstName) using your historical and geographical knowledge of names. Never leave the gender field empty.";
+    var prompt="Analyze this identity document. Return ONLY raw JSON, no markdown:\n{\"lastName\":\"SURNAME\",\"firstName\":\"Given name\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"POLAND/ITALIA/etc\",\"birthCountry\":\"\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact number\"}\nReturn raw JSON only.";
     
-    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+apiKey,{
+    // Używamy TYLKO stabilnego modelu Lite
+    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         contents:[{parts:[{inlineData:{mime_type:mt,data:b64}},{text:prompt}]}],
-        generationConfig:{maxOutputTokens:400,temperature:0,responseMimeType:"application/json",
-          responseSchema:{type:"OBJECT",properties:{lastName:{type:"STRING"},firstName:{type:"STRING"},dateOfBirth:{type:"STRING"},nationality:{type:"STRING"},birthCountry:{type:"STRING"},docType:{type:"STRING"},docNumber:{type:"STRING"},gender:{type:"STRING"}},required:["lastName","firstName","gender"]}},
-        safetySettings:[{category:"HARM_CATEGORY_HARASSMENT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_HATE_SPEECH",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_SEXUALLY_EXPLICIT",threshold:"BLOCK_NONE"},{category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_NONE"}]
+        generationConfig:{maxOutputTokens:400,temperature:0,responseMimeType:"application/json"}
       })
     })
     .then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error((e.error&&e.error.message)||"HTTP "+r.status);});return r.json();})
     .then(function(data){
       document.getElementById("ocrStatus").style.display="none";
-      if(data.candidates&&data.candidates[0]&&data.candidates[0].finishReason==="SAFETY")throw new Error("Gemini zablokowało skan. Spróbuj innego zdjęcia.");
       var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
       var txt=parts.map(function(x){return x.text||"";}).join("").trim();
-      if(!txt)throw new Error("Pusta odpowiedź AI.");
       txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```$/,"").trim();
       var m=txt.match(/\{[\s\S]*\}/);
-      if(!m)throw new Error("Brak JSON w odpowiedzi.");
+      if(!m)throw new Error("Brak danych w odpowiedzi");
       var p=JSON.parse(m[0]);
       
-      // Filtrowanie i czyszczenie znaków specjalnych (Ö -> O itd.) przy użyciu san()
-      document.getElementById("oLast").value=san(p.lastName)||"";
-      document.getElementById("oFirst").value=san(p.firstName)||"";
+      document.getElementById("oLast").value=san(p.lastName||"");
+      document.getElementById("oFirst").value=san(p.firstName||"");
       document.getElementById("oDob").value=p.dateOfBirth||"";
-      document.getElementById("oNat").value=san(p.nationality)||"";
-      document.getElementById("oBirth").value=(p.birthCountry&&p.birthCountry!==p.nationality)?san(p.birthCountry):"";
-      document.getElementById("oResid").value="";
+      document.getElementById("oNat").value=san(p.nationality||"");
+      document.getElementById("oBirth").value=san(p.birthCountry||"");
       document.getElementById("oDocType").value=p.docType||"";
-      document.getElementById("oDocNum").value=san(p.docNumber)||"";
-      
+      document.getElementById("oDocNum").value=san(p.docNumber||"");
       setOcrGender(p.gender||"");
+      
       document.getElementById("ocrResult").style.display="block";
-      
-      // Dynamiczna zmiana nazwy przycisku na ZATWIERDŹ
-      document.getElementById("btnOcrNew").textContent = "✓ ZATWIERDŹ";
-      
-      if(ocrQueue.length>0){
-        document.getElementById("ocrQueueInfo").style.display="block";
-        document.getElementById("ocrQueueInfo").textContent="✓ Gotowe. Zatwierdź obecnego gościa, aby załadować następny dokument ("+ocrQueue.length+" pozostało)";
-      } else {
-        document.getElementById("ocrQueueInfo").style.display="none";
-      }
       refreshOcrBtns();
-      
-      // Zapisujemy referencję do callbacku zakończenia tego kroku skanu
-      window.currentOcrDoneCallback = onDone;
+      onDone();
     })
     .catch(function(err){
       document.getElementById("ocrStatus").style.display="none";
       document.getElementById("ocrErr").style.display="block";
-      document.getElementById("ocrErr").innerHTML="✗ "+err.message+'<br/><span style="font-size:12px;color:var(--text3);">Sprawdź klucz API w ustawieniach ⚙️</span>';
-      document.getElementById("uploadZoneWrap").style.display="block";
+      document.getElementById("ocrErr").innerHTML="✗ "+err.message;
       onDone();
     });
   };
@@ -818,20 +794,12 @@ function applyOcr(guestId){
   document.getElementById("btnGotoLista").textContent="Lista gości ("+guests.length+") →";
   refreshOcrBtns();
 
-  // KROK KOLEJKI: Ukrywamy stary wynik i odpalamy kolejny dokument, jeśli istnieje w kolejce
+  // Kolejka
   if(ocrQueue.length > 0) {
     document.getElementById("ocrResult").style.display="none";
-    var nextFile = ocrQueue.shift();
-    runOcr(nextFile, function(){});
+    processOcrQueue();
   } else {
-    // Jeżeli to był ostatni dokument z kolejki, pokazujemy strefę uploadu z powrotem na przyszłość
     document.getElementById("uploadZoneWrap").style.display="block";
-  }
-
-  if (typeof window.currentOcrDoneCallback === "function") {
-    var callback = window.currentOcrDoneCallback;
-    window.currentOcrDoneCallback = null;
-    callback();
   }
 }
 
@@ -843,6 +811,7 @@ var dz=document.getElementById("dropZone");
 dz.addEventListener("dragover",function(e){e.preventDefault();dz.classList.add("drag");});
 dz.addEventListener("dragleave",function(){dz.classList.remove("drag");});
 dz.addEventListener("drop",function(e){e.preventDefault();dz.classList.remove("drag");if(e.dataTransfer.files.length)addToQueue(e.dataTransfer.files);});
+
 
 // ═══════════════════════════════════════
 // LISTA
