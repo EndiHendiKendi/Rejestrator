@@ -416,7 +416,7 @@ select.inp{cursor:pointer;}
   </div>
 
   <div id="gotoLista" style="display:none;padding:0 16px;">
-    <button id="btnGotoLista" class="btn btn-secondary">Przejdź do listy gości →</button>
+    <button id="btnGotoLista" class="btn btn-secondary">Lista gości (0) →</button>
   </div>
 </div>
 
@@ -537,7 +537,7 @@ var DM={à:"a",á:"a",â:"a",ã:"a",ä:"a",å:"a",æ:"ae",è:"e",é:"e",ê:"e",�
 function san(s){return String(s||"").split("").map(function(c){return DM[c]||c;}).join("").replace(/[^A-Za-z0-9\s\-'.\/]/g,"").replace(/\s+/g," ").trim().toUpperCase();}
 
 var NC={"SVIZZERA":"100000100","SUISSE":"100000100","SWITZERLAND":"100000100","SCHWEIZ":"100000100","CHE":"100000100","FRANCE":"100000060","FRANCIA":"100000060","FRANKREICH":"100000060","FRA":"100000060","ITALIA":"100000073","ITALY":"100000073","ITALIE":"100000073","ITALIEN":"100000073","ITA":"100000073","GERMANY":"100000065","GERMANIA":"100000065","DEUTSCHLAND":"100000065","ALLEMAGNE":"100000065","DEU":"100000065","AUSTRIA":"100000014","OSTERREICH":"100000014","AUTRICHE":"100000014","AUT":"100000014","SPAIN":"100000109","SPAGNA":"100000109","ESPAGNE":"100000109","ESP":"100000109","BELGIUM":"100000017","BELGIO":"100000017","BELGIQUE":"100000017","BEL":"100000017","POLAND":"100000087","POLONIA":"100000087","POLOGNE":"100000087","POLSKA":"100000087","POL":"100000087","UNITED KINGDOM":"100000123","UK":"100000123","REGNO UNITO":"100000123","GBR":"100000123","NETHERLANDS":"100000079","PAESI BASSI":"100000079","NEDERLAND":"100000079","NLD":"100000079","PORTUGAL":"100000088","PORTOGALLO":"100000088","PRT":"100000088","SWEDEN":"100000113","SVEZIA":"100000113","SWE":"100000113","NORWAY":"100000082","NORVEGIA":"100000082","NOR":"100000082","DENMARK":"100000038","DANIMARCA":"100000038","DNK":"100000038","FINLAND":"100000059","FINLANDIA":"100000059","FIN":"100000059","USA":"100000130","STATI UNITI":"100000130","UNITED STATES":"100000130","CANADA":"100000025","CAN":"100000025","AUSTRALIA":"100000010","AUS":"100000010","JAPAN":"100000074","GIAPPONE":"100000074","JPN":"100000074","CHINA":"100000031","CINA":"100000031","CHN":"100000031","BRAZIL":"100000022","BRASILE":"100000022","BRA":"100000022","RUSSIA":"100000099","RUS":"100000099","TURKEY":"100000121","TURCHIA":"100000121","TUR":"100000121","GREECE":"100000067","GRECIA":"100000067","GRC":"100000067","ROMANIA":"100000097","ROU":"100000097","MOROCCO":"100000075","MAROCCO":"100000075","MAR":"100000075","CZECH REPUBLIC":"100000034","CECHIA":"100000034","CZE":"100000034","HUNGARY":"100000070","UNGHERIA":"100000070","HUN":"100000070","CROATIA":"100000039","CROAZIA":"100000039","HRV":"100000039","ARGENTINA":"100000008","ARG":"100000008","INDIA":"100000071","IND":"100000071"};
-var CM={"suisse":"SVIZZERA","switzerland":"SVIZZERA","schweiz":"SVIZZERA","svizzera":"SVIZZERA","che":"SVIZZERA","france":"FRANCE","frankreich":"FRANCE","francia":"FRANCE","fra":"FRANCE","italia":"ITALIA","italy":"ITALIA","italie":"ITALIA","italien":"ITALIA","ita":"ITALIA","germany":"GERMANY","deutschland":"GERMANY","allemagne":"GERMANY","germania":"GERMANY","deu":"GERMANY","österreich":"AUSTRIA","osterreich":"AUSTRIA","austria":"AUSTRIA","autriche":"AUSTRIA","aut":"AUSTRIA","spain":"SPAIN","espagne":"SPAIN","espana":"SPAIN","spagna":"SPAIN","esp":"SPAIN","españa":"SPAIN","belgium":"BELGIUM","belgique":"BELGIUM","belgio":"BELGIUM","belgien":"BELGIUM","bel":"BELGIUM","poland":"POLAND","pologne":"POLAND","polska":"POLAND","polonia":"POLAND","pol":"POLAND","united kingdom":"UNITED KINGDOM","uk":"UNITED KINGDOM","grande-bretagne":"UNITED KINGDOM","gbr":"UNITED KINGDOM","england":"UNITED KINGDOM","netherlands":"NETHERLANDS","nederland":"NETHERLANDS","pays-bas":"NETHERLANDS","nld":"NETHERLANDS","holland":"NETHERLANDS","portugal":"PORTUGAL","portogallo":"PORTUGAL","prt":"PORTUGAL","sweden":"SWEDEN","svezia":"SWEDEN","suede":"SWEDEN","sverige":"SWEDEN","swe":"SWEDEN","norway":"NORWAY","norvegia":"NORWAY","nor":"NORWAY","denmark":"DENMARK","danimarca":"DENMARK","dnk":"DENMARK","finland":"FINLAND","finlandia":"FINLAND","fin":"FINLAND","usa":"USA","united states":"USA","etats-unis":"USA","stati uniti":"USA","canada":"CANADA","can":"CANADA","australia":"AUSTRALIA","aus":"AUSTRALIA","japan":"JAPAN","japon":"JAPAN","giappone":"JAPAN","jpn":"JAPAN","china":"CHINA","chine":"CHINA","cina":"CHINA","chn":"CHINA","brazil":"BRAZIL","bresil":"BRAZIL","brasile":"BRAZIL","brasil":"BRAZIL","bra":"BRAZIL","russia":"RUSSIA","rus":"RUSSIA","turkey":"TURKEY","turchia":"TURKEY","tur":"TURKEY","greece":"GREECE","grecia":"GREECE","grc":"GREECE","romania":"ROMANIA","rou":"ROMANIA","morocco":"MOROCCO","marocco":"MOROCCO","mar":"MOROCCO","czech republic":"CZECH REPUBLIC","cechia":"CZECH REPUBLIC","cze":"CZECH REPUBLIC","hungary":"HUNGARY","ungheria":"HUNGARY","hun":"HUNGARY","croatia":"CROATIA","croazia":"CROATIA","hrv":"CROATIA","argentina":"ARGENTINA","arg":"ARGENTINA","india":"INDIA","ind":"INDIA"};
+var CM={"suisse":"SVIZZERA","switzerland":"SVIZZERA","schweiz":"SVIZZERA","svizzera":"SVIZZERA","che":"SVIZZERA","france":"FRANCE","frankreich":"FRANCE","francia":"FRANCE","fra":"FRANCE","italia":"ITALIA","italy":"ITALIA","italie":"ITALIA","italien":"ITALIA","ita":"ITALIA","germany":"GERMANY","deutschland":"GERMANY","allemagne":"GERMANY","germania":"GERMANY","deutsch":"GERMANY","deu":"GERMANY","österreich":"AUSTRIA","osterreich":"AUSTRIA","austria":"AUSTRIA","autriche":"AUSTRIA","aut":"AUSTRIA","spain":"SPAIN","espagne":"SPAIN","espana":"SPAIN","spagna":"SPAIN","esp":"SPAIN","españa":"SPAIN","belgium":"BELGIUM","belgique":"BELGIUM","belgio":"BELGIUM","belgien":"BELGIUM","bel":"BELGIUM","poland":"POLAND","pologne":"POLAND","polska":"POLAND","polonia":"POLAND","pol":"POLAND","united kingdom":"UNITED KINGDOM","uk":"UNITED KINGDOM","grande-bretagne":"UNITED KINGDOM","gbr":"UNITED KINGDOM","england":"UNITED KINGDOM","netherlands":"NETHERLANDS","nederland":"NETHERLANDS","pays-bas":"NETHERLANDS","nld":"NETHERLANDS","holland":"NETHERLANDS","portugal":"PORTUGAL","portogallo":"PORTUGAL","prt":"PORTUGAL","sweden":"SWEDEN","svezia":"SWEDEN","suede":"SWEDEN","sverige":"SWEDEN","swe":"SWEDEN","norway":"NORWAY","norvegia":"NORWAY","nor":"NORWAY","denmark":"DENMARK","danimarca":"DENMARK","dnk":"DENMARK","finland":"FINLAND","finlandia":"FINLAND","fin":"FINLAND","usa":"USA","united states":"USA","etats-unis":"USA","stati uniti":"USA","canada":"CANADA","can":"CANADA","australia":"AUSTRALIA","aus":"AUSTRALIA","japan":"JAPAN","japon":"JAPAN","giappone":"JAPAN","jpn":"JAPAN","china":"CHINA","chine":"CHINA","cina":"CHINA","chn":"CHINA","brazil":"BRAZIL","bresil":"BRAZIL","brasile":"BRAZIL","brasil":"BRAZIL","bra":"BRAZIL","russia":"RUSSIA","rus":"RUSSIA","turkey":"TURKEY","turchia":"TURKEY","tur":"TURKEY","greece":"GREECE","grecia":"GREECE","grc":"GREECE","romania":"ROMANIA","rou":"ROMANIA","morocco":"MOROCCO","marocco":"MOROCCO","mar":"MOROCCO","czech republic":"CZECH REPUBLIC","cechia":"CZECH REPUBLIC","cze":"CZECH REPUBLIC","hungary":"HUNGARY","ungheria":"HUNGARY","hun":"HUNGARY","croatia":"CROATIA","croazia":"CROATIA","hrv":"CROATIA","argentina":"ARGENTINA","arg":"ARGENTINA","india":"INDIA","ind":"INDIA"};
 function normC(r){var k=String(r||"").toLowerCase().trim().replace(/[éèêë]/g,"e").replace(/[àâ]/g,"a").replace(/[ùû]/g,"u").replace(/œ/g,"oe").replace(/ü/g,"u").replace(/ö/g,"o").replace(/ä/g,"a").replace(/ß/g,"ss");return CM[k]||san(r).toUpperCase();}
 function isIT(r){return["italia","italy","italie","italien","ita"].indexOf(String(r||"").toLowerCase().trim())>=0;}
 function getNC(c){return NC[String(c||"").toUpperCase()]||"000000000";}
@@ -564,6 +564,7 @@ function normGender(r){
 // ═══════════════════════════════════════
 var guests=[];
 var ocrGender="";
+var editingGuestId=null;
 var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 
 // ═══════════════════════════════════════
@@ -648,6 +649,7 @@ document.getElementById("btnProcess").addEventListener("click",function(){
     guests.push({id:uid(),firstName:san(fn),lastName:san(ln),rawFirst:fn,rawLast:ln,gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),isLeader:isLeader,gtype:gtype,docType:"",docNumber:"",role:isLeader?"Capogruppo":"Membro"});
   }
   if(guests.length>0&&!guests.some(function(x){return x.isLeader;})){guests[0].isLeader=true;guests[0].role="Capogruppo";}
+  updateSkanBtn();
   showScreen("lista");
 });
 
@@ -656,6 +658,11 @@ document.getElementById("btnProcess").addEventListener("click",function(){
 // ═══════════════════════════════════════
 var ocrQueue=[];
 var ocrProcessing=false;
+
+function updateSkanBtn(){
+  document.getElementById("gotoLista").style.display=(guests.length>0)?"block":"none";
+  document.getElementById("btnGotoLista").textContent="Lista gości ("+guests.length+") →";
+}
 
 function setOcrGender(g){
   ocrGender=g;
@@ -668,10 +675,11 @@ document.getElementById("oDocNum").addEventListener("input",function(){this.valu
 
 function processOcrQueue(){
   if(ocrProcessing||!ocrQueue.length)return;
-  ocrProcessing=true; // Ustawiamy flagę
+  ocrProcessing=true;
   var file=ocrQueue.shift();
   runOcr(file,function(){
     ocrProcessing=false;
+    processOcrQueue();
   });
 }
 
@@ -687,7 +695,6 @@ function runOcr(file,onDone){
   var apiKey=getApiKey();
   if(!apiKey){openSettings();onDone();return;}
   
-  // Reset pól
   document.getElementById("oLast").value="";
   document.getElementById("oFirst").value="";
   document.getElementById("oDob").value="";
@@ -711,7 +718,6 @@ function runOcr(file,onDone){
     
     var prompt="Analyze this identity document. Return ONLY raw JSON, no markdown:\n{\"lastName\":\"SURNAME\",\"firstName\":\"Given name\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"POLAND/ITALIA/etc\",\"birthCountry\":\"\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact number\"}\nReturn raw JSON only.";
     
-    // Używamy TYLKO stabilnego modelu Lite
     fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
       method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -739,7 +745,6 @@ function runOcr(file,onDone){
       setOcrGender(p.gender||"");
       
       document.getElementById("ocrResult").style.display="block";
-      refreshOcrBtns();
       onDone();
     })
     .catch(function(err){
@@ -752,25 +757,27 @@ function runOcr(file,onDone){
   reader.readAsDataURL(file);
 }
 
-function refreshOcrBtns(){}
-
-document.getElementById("btnOcrNew").addEventListener("click",function(){applyOcr(null);});
+document.getElementById("btnOcrNew").addEventListener("click",function(){applyOcr(editingGuestId);});
 
 function applyOcr(guestId){
   var gtype=document.getElementById("selGtype").value;
   var nat=document.getElementById("oNat").value;
-  var birth=document.getElementById("oBirth").value||nat;
-  var resid=document.getElementById("oResid").value||nat;
+  var birth=document.getElementById("oBirth").value;
+  var resid=document.getElementById("oResid").value;
+
+  if(normC(nat) === normC(birth)) document.getElementById("oBirth").value = "";
+  if(normC(nat) === normC(resid)) document.getElementById("oResid").value = "";
 
   var natC = normC(nat);
-  var birthC = normC(birth);
-  var resC = normC(resid);
+  var birthC = normC(document.getElementById("oBirth").value||nat);
+  var resC = normC(document.getElementById("oResid").value||nat);
   
-  // Poprawka: logiczne dopasowanie krajów i czyszczenie jeśli takie same
   birthC = (birthC === natC) ? "" : birthC;
   resC = (resC === natC) ? "" : resC;
   
-  var isFirst = (guests.length === 0);
+  // Logika lidera
+  var currentGuest = guestId ? guests.find(function(g){return g.id === guestId;}) : null;
+  var isLeader = currentGuest ? currentGuest.isLeader : (guests.length === 0);
   
   var up={
     lastName:san(document.getElementById("oLast").value),
@@ -781,26 +788,20 @@ function applyOcr(guestId){
     birthC:birthC,
     residC:resC,
     isItaly:isIT(nat),
-    docType:isFirst ? document.getElementById("oDocType").value : "",
-    docNumber:isFirst ? san(document.getElementById("oDocNum").value) : ""
+    docType:isLeader ? document.getElementById("oDocType").value : "",
+    docNumber:isLeader ? san(document.getElementById("oDocNum").value) : ""
   };
   
   if(guestId){
-    for(var i=0;i<guests.length;i++){if(guests[i].id===guestId){Object.assign(guests[i],up);break;}}
+    Object.assign(currentGuest, up);
+    editingGuestId = null;
   } else {
-    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,role:isFirst?"Capogruppo":"Membro"});
+    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isLeader,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,role:isLeader?"Capogruppo":"Membro"});
   }
   
   document.getElementById("ocrResult").style.display="none";
-  document.getElementById("gotoLista").style.display="block";
-  document.getElementById("btnGotoLista").textContent="Lista gości ("+guests.length+") →";
-  
-  // Kolejka
-  if(ocrQueue.length > 0) {
-    processOcrQueue();
-  } else {
-    document.getElementById("uploadZoneWrap").style.display="block";
-  }
+  document.getElementById("uploadZoneWrap").style.display="block";
+  updateSkanBtn();
 }
 
 document.getElementById("btnGotoLista").addEventListener("click",function(){showScreen("lista");});
@@ -856,7 +857,6 @@ function renderLista(){
       html+='<input class="inp" data-gid="'+g.id+'" data-field="docNumber" value="'+(g.docNumber||"")+'" placeholder="Numero documento" style="letter-spacing:2px;font-family:\'SF Mono\',monospace;font-size:14px;text-transform:uppercase;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';" />';
       html+='</div>';
     }
-    // Przycisk edycji i usuwania dla KAŻDEGO
     html += '<div style="margin-top:10px;display:flex;gap:10px;">' +
       '<button onclick="editGuest(\''+g.id+'\')" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">✏️ Edytuj</button>' +
       '<button onclick="removeGuest(\''+g.id+'\')" class="btn btn-danger" style="padding:4px 8px;font-size:12px;">🗑️ Usuń</button>' +
@@ -872,16 +872,24 @@ function renderLista(){
 
 function removeGuest(id) {
   guests = guests.filter(function(g){ return g.id !== id; });
+  updateSkanBtn();
   renderLista();
 }
 
 function editGuest(id) {
+  editingGuestId = id;
   var g = guests.find(function(x){ return x.id === id; });
   document.getElementById("oLast").value = g.lastName;
   document.getElementById("oFirst").value = g.firstName;
   document.getElementById("oDob").value = g.dob;
+  document.getElementById("oNat").value = g.cit;
+  document.getElementById("oBirth").value = g.birthC;
+  document.getElementById("oResid").value = g.residC;
   document.getElementById("oDocType").value = g.docType;
   document.getElementById("oDocNum").value = g.docNumber;
+  setOcrGender(g.gender);
+  document.getElementById("ocrResult").style.display="block";
+  document.getElementById("uploadZoneWrap").style.display="none";
   showScreen("skan");
 }
 
