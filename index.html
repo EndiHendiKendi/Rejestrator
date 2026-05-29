@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<meta name="apple-mobile-web-app-title" content="Meldunek"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<title>Meldunek</title>
+  <link rel="manifest" href="manifest.json">
+<style>
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0a0a0f;
+  --bg2:#111118;
+  --card:#1a1a24;
+  --card2:#222230;
+  --border:#2a2a3a;
+  --gold:#c9a96e;
+  --gold2:#e8c98a;
+  --green:#22c55e;
+  --red:#ef4444;
+  --blue:#3b82f6;
+  --purple:#8b5cf6;
+  --text:#f0f0f5;
+  --text2:#a0a0b8;
+  --text3:#606070;
+}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',system-ui,sans-serif;
+  font-size:15px;
+  max-width:430px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ── SCROLLABLE CONTENT ── */
+.screen{display:none;flex:1;overflow-y:auto;padding:0 0 90px 0;}
+.screen.active{display:block;}
+
+/* ── HEADER ── */
+.topbar{
+  padding:56px 20px 8px;
+  background:var(--bg);
+  position:sticky;
+  top:0;
+  z-index:50;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.topbar-title{font-size:28px;font-weight:700;letter-spacing:-0.5px;}
+.topbar-sub{font-size:13px;color:var(--text3);margin-top:2px;}
+.icon-btn{
+  width:40px;height:40px;border-radius:50%;
+  background:var(--card);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:16px;color:var(--text2);
+  flex-shrink:0;
+}
+
+/* ── BOTTOM NAV ── */
+.nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  background:rgba(10,10,15,0.92);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  display:flex;
+  z-index:100;
+  padding-bottom:env(safe-area-inset-bottom, 8px);
+}
+.nav-btn{
+  flex:1;padding:12px 4px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  border:none;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:10px;font-weight:500;
+  color:var(--text3);letter-spacing:0.3px;
+  transition:color .15s;
+}
+.nav-btn.active{color:var(--gold);}
+.nav-btn svg{width:22px;height:22px;transition:transform .15s;}
+.nav-btn.active svg{transform:scale(1.1);}
+
+/* ── CARDS ── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:18px;
+  margin:0 16px 12px;
+}
+.card-sm{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  margin:0 16px 10px;
+}
+.card-gold{
+  background:linear-gradient(135deg,#1a1508 0%,#1f1a0a 100%);
+  border:1px solid rgba(201,169,110,.25);
+  border-radius:20px;
+  padding:20px;
+  margin:0 16px 12px;
+}
+
+/* ── SECTION LABEL ── */
+.section-lbl{
+  font-size:11px;font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;color:var(--text3);
+  padding:0 20px;margin:20px 0 8px;
+}
+
+/* ── INPUTS ── */
+.field-group{margin-bottom:14px;}
+.field-lbl{font-size:12px;font-weight:500;color:var(--text3);margin-bottom:6px;display:block;letter-spacing:0.3px;}
+.inp{
+  width:100%;background:var(--card2);
+  border:1.5px solid var(--border);
+  color:var(--text);padding:13px 14px;
+  border-radius:12px;outline:none;font-size:15px;
+  font-family:inherit;transition:border-color .15s;
+  -webkit-appearance:none;
+}
+.inp:focus{border-color:var(--gold);}
+.inp-big{
+  font-size:22px;font-weight:700;color:var(--gold2);
+  border-color:rgba(201,169,110,.3);background:#141008;
+  letter-spacing:-0.5px;
+}
+.inp-big:focus{border-color:var(--gold);}
+select.inp{cursor:pointer;}
+
+/* ── DATE DISPLAY ── */
+.dep-display{
+  background:var(--card2);border-radius:12px;
+  padding:14px 16px;text-align:center;
+  border:1px solid var(--border);
+}
+.dep-label{font-size:11px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;}
+.dep-val{font-size:26px;font-weight:700;color:var(--blue);letter-spacing:-0.5px;}
+
+/* ── BUTTONS ── */
+.btn{
+  width:100%;padding:16px;border:none;
+  border-radius:14px;cursor:pointer;
+  font-family:inherit;font-size:15px;
+  font-weight:600;transition:all .15s;
+  letter-spacing:0.1px;
+}
+.btn-primary{background:var(--gold);color:#0a0a0f;}
+.btn-primary:active{background:var(--gold2);}
+.btn-primary:disabled{background:var(--card2);color:var(--text3);cursor:not-allowed;}
+.btn-secondary{background:var(--card2);color:var(--text);border:1.5px solid var(--border);}
+.btn-green{background:#166534;color:#4ade80;border:1px solid #16a34a;}
+.btn-danger{background:transparent;color:var(--red);border:1.5px solid rgba(239,68,68,.3);}
+
+/* ── GENDER BUTTONS ── */
+.gender-row{display:flex;gap:10px;}
+.gender-btn{
+  flex:1;padding:13px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:500;
+  background:var(--card2);border:1.5px solid var(--border);
+  color:var(--text2);transition:all .15s;
+}
+.gender-btn.on{background:rgba(201,169,110,.15);border-color:var(--gold);color:var(--gold2);font-weight:600;}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+.badge-gold{background:rgba(201,169,110,.12);color:var(--gold2);border:1px solid rgba(201,169,110,.2);}
+.badge-green{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2);}
+.badge-blue{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2);}
+
+/* ── GUEST CARD ── */
+.guest-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:14px;margin:0 16px 8px;
+  transition:border-color .15s;
+}
+.guest-card.leader{border-color:rgba(201,169,110,.3);background:linear-gradient(135deg,#141008,#1a1508);}
+.guest-name{font-size:17px;font-weight:600;letter-spacing:-0.2px;}
+.guest-meta{font-size:13px;color:var(--text2);margin-top:4px;}
+
+/* ── STATUS INDICATORS ── */
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green);}
+.dot-red{background:var(--red);}
+.dot-gold{background:var(--gold);box-shadow:0 0 6px var(--gold);}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  margin:0 16px 12px;
+  border:2px dashed rgba(201,169,110,.3);
+  border-radius:20px;padding:32px 20px;
+  text-align:center;background:rgba(201,169,110,.03);
+  cursor:pointer;transition:all .2s;
+}
+.upload-zone:active,.upload-zone.drag{border-color:var(--gold);background:rgba(201,169,110,.07);}
+.upload-zone label{display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;}
+
+/* ── ALERTS ── */
+.alert{border-radius:14px;padding:14px 16px;margin:0 16px 10px;font-size:13px;line-height:1.5;}
+.alert-err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#fca5a5;}
+.alert-ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#86efac;}
+.alert-info{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:#93c5fd;}
+.alert-warn{background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.2);color:var(--gold2);}
+
+/* ── OCR RESULT ── */
+.ocr-result-card{
+  background:linear-gradient(135deg,#0a180a,#0f1f0f);
+  border:1px solid rgba(34,197,94,.2);
+  border-radius:20px;padding:18px;margin:0 16px 12px;
+}
+
+/* ── SPINNER ── */
+.spin{display:inline-block;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── STATUS BAR ── */
+.status-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin:0 16px 10px;padding:10px 14px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;
+}
+
+/* ── PREVIEW CODE ── */
+.code-block{
+  background:#05050a;border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;
+  font-family:'SF Mono','Menlo',monospace;font-size:10px;
+  color:var(--green);overflow-x:auto;white-space:nowrap;
+  letter-spacing:.5px;margin-top:6px;
+}
+
+/* ── OVERLAY ── */
+.overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);z-index:200;overflow-y:auto;
+}
+.overlay-sheet{
+  position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  background:var(--bg2);border-radius:24px 24px 0 0;
+  padding:8px 20px 48px;max-height:90vh;overflow-y:auto;
+}
+.sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 20px;}
+.sheet-title{font-size:20px;font-weight:700;margin-bottom:4px;}
+.sheet-sub{font-size:14px;color:var(--text2);margin-bottom:20px;}
+
+/* ── UTILS ── */
+.row{display:flex;align-items:center;gap:10px;}
+.row-between{display:flex;align-items:center;justify-content:space-between;}
+.gap-s{gap:8px;}.gap-m{gap:12px;}
+.mt4{margin-top:4px;}.mt8{margin-top:8px;}.mt12{margin-top:12px;}.mt16{margin-top:16px;}
+.mb4{margin-bottom:4px;}.mb8{margin-bottom:8px;}.mb12{margin-bottom:12px;}.mb14{margin-bottom:14px;}
+.px{padding-left:20px;padding-right:20px;}
+.pt8{padding-top:8px;}
+</style>
+</head>
+<body>
+
+<div class="screen active" id="s-dane">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Meldunek</div>
+      <div class="topbar-sub">La Luna Bastremoli · L10046</div>
+    </div>
+    <div class="icon-btn" id="btnSettings">⚙️</div>
+  </div>
+
+  <div class="card-gold">
+    <div style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:rgba(201,169,110,.6);margin-bottom:14px;">📅 Pobyt</div>
+    <div class="field-group">
+      <label class="field-lbl">Data zameldowania</label>
+      <input id="inpArr" class="inp inp-big" placeholder="DD/MM/YYYY" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-lbl">Liczba nocy</label>
+      <input id="inpNights" type="number" min="1" max="90" value="2" class="inp inp-big" style="color:var(--text);"/>
+    </div>
+    <div class="dep-display">
+      <div class="dep-label">Wymeldowanie</div>
+      <div class="dep-val" id="dispDep">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field-group mb8">
+      <label class="field-lbl">Tipo gruppo</label>
+      <select id="selGtype" class="inp">
+        <option value="gruppo">Gruppo turistico (18/20)</option>
+        <option value="famiglia">Famiglia (17/19)</option>
+      </select>
+    </div>
+    <div>
+      <label class="field-lbl">Camere occupate</label>
+      <input id="inpCamOcc" type="number" min="1" value="1" class="inp"/>
+    </div>
+  </div>
+
+  <div style="padding:0 20px 8px;">
+    <div style="font-size:13px;font-weight:600;color:var(--text2);">Dati ospiti</div>
+  </div>
+  <div style="padding:0 16px;">
+    <textarea id="taGuests" class="inp" rows="10"
+      style="resize:vertical;line-height:1.7;font-size:13px;font-family:'SF Mono','Menlo',monospace;border-radius:16px;"
+      placeholder="Jan Kowalski&#10;M&#10;15.03.1985&#10;Polska&#10;&#10;Maria Nowak&#10;F&#10;22.07.1990&#10;France"></textarea>
+  </div>
+  <div style="padding:12px 16px 0;">
+    <button id="btnProcess" class="btn btn-primary">Przetwórz dane</button>
+  </div>
+</div>
+
+<div class="screen" id="s-skan">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Skan</div>
+      <div class="topbar-sub">Odczyt dokumentów przez AI</div>
+    </div>
+    <div id="keyStatusBar" class="row" style="gap:6px;cursor:pointer;" onclick="openSettings()">
+      <span class="dot dot-red" id="keyDot"></span>
+      <span style="font-size:12px;color:var(--text3);" id="keyTxt">Brak klucza</span>
+    </div>
+  </div>
+
+  <div id="ocrStatus" style="display:none;" class="alert alert-info" style="margin:0 16px 12px;">
+    <div class="row">
+      <span class="spin" style="font-size:18px;">⏳</span>
+      <div>
+        <div style="font-weight:600;" id="ocrStatusTxt">Analizuję dokument...</div>
+        <div style="font-size:12px;color:var(--text2);">Google Gemini AI</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ocrQueueInfo" class="alert alert-warn" style="display:none;"></div>
+  <div id="ocrErr" class="alert alert-err" style="display:none;"></div>
+
+  <div id="ocrResult" style="display:none;">
+    <div class="ocr-result-card">
+      <div class="row mb12">
+        <span class="dot dot-green"></span>
+        <span style="font-size:13px;font-weight:600;color:#4ade80;">Odczytano — sprawdź dane</span>
+      </div>
+      <div class="field-group mb8"><label class="field-lbl">Nazwisko</label><input id="oLast" class="inp"/></div>
+      <div class="field-group mb8"><label class="field-lbl">Imię</label><input id="oFirst" class="inp"/></div>
+      <div class="field-group mb8"><label class="field-lbl">Data urodzenia</label><input id="oDob" class="inp" placeholder="DD/MM/YYYY"/></div>
+      <div class="field-group mb8">
+        <label class="field-lbl">Płeć</label>
+        <div class="gender-row">
+          <button class="gender-btn" id="gBtnM">♂ Mężczyzna</button>
+          <button class="gender-btn" id="gBtnF">♀ Kobieta</button>
+        </div>
+      </div>
+      <div class="field-group mb8">
+        <label class="field-lbl">Obywatelstwo</label>
+        <input id="oNat" class="inp" list="natList" placeholder="np. SVIZZERA"/>
+        <datalist id="natList"><option>SVIZZERA</option><option>FRANCE</option><option>GERMANY</option><option>ITALIA</option><option>POLAND</option><option>AUSTRIA</option><option>BELGIUM</option><option>NETHERLANDS</option><option>SPAIN</option><option>UNITED KINGDOM</option><option>USA</option><option>CANADA</option><option>PORTUGAL</option><option>SWEDEN</option><option>NORWAY</option></datalist>
+      </div>
+      <div class="field-group mb8">
+        <label class="field-lbl">Kraj urodzenia <span style="color:var(--text3);font-weight:400;">(puste = obywatelstwo)</span></label>
+        <input id="oBirth" class="inp" list="natList2" placeholder="zostaw puste jeśli takie samo"/>
+        <datalist id="natList2"><option>SVIZZERA</option><option>FRANCE</option><option>GERMANY</option><option>ITALIA</option><option>POLAND</option><option>AUSTRIA</option><option>BELGIUM</option><option>NETHERLANDS</option><option>SPAIN</option><option>UNITED KINGDOM</option><option>USA</option><option>CANADA</option></datalist>
+      </div>
+      <div class="field-group mb8">
+        <label class="field-lbl">Kraj zamieszkania <span style="color:var(--text3);font-weight:400;">(puste = obywatelstwo)</span></label>
+        <input id="oResid" class="inp" list="natList3" placeholder="zostaw puste jeśli takie samo"/>
+        <datalist id="natList3"><option>SVIZZERA</option><option>FRANCE</option><option>GERMANY</option><option>ITALIA</option><option>POLAND</option><option>AUSTRIA</option><option>BELGIUM</option><option>NETHERLANDS</option><option>SPAIN</option><option>UNITED KINGDOM</option><option>USA</option><option>CANADA</option></datalist>
+      </div>
+      <div class="field-group mb8">
+        <label class="field-lbl">Typ dokumentu</label>
+        <select id="oDocType" class="inp">
+          <option value="">— wybierz —</option>
+          <option value="PASSAPORTO">Passaporto</option>
+          <option value="CARTA D'IDENTITA">Carta d'identità</option>
+          <option value="PATENTE">Patente</option>
+        </select>
+      </div>
+      <div class="field-group mb14">
+        <label class="field-lbl">Numer dokumentu</label>
+        <input id="oDocNum" class="inp" style="letter-spacing:2px;text-transform:uppercase;font-family:'SF Mono','Menlo',monospace;"/>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;">Zastosuj do:</div>
+      <button id="btnOcrNew" class="btn btn-green mb8">＋ Zatwierdź</button>
+      <div id="ocrGuestBtns"></div>
+    </div>
+    <div style="padding:0 16px 4px;">
+      <label for="inpOcr2" style="display:block;">
+        <div class="btn btn-secondary" style="text-align:center;cursor:pointer;">📷 Skanuj kolejny dokument</div>
+      </label>
+      <input type="file" id="inpOcr2" accept="image/*" style="display:none" multiple/>
+    </div>
+  </div>
+
+  <div id="uploadZoneWrap">
+    <div class="upload-zone" id="dropZone">
+      <label for="inpOcr">
+        <div style="font-size:44px;margin-bottom:4px;">📄</div>
+        <div style="font-size:17px;font-weight:700;color:var(--gold2);">Dodaj zdjęcie dokumentu</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:2px;">Paszport · Karta ID · Prawo jazdy</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;">Dowolny kraj · Dowolny język</div>
+      </label>
+      <input type="file" id="inpOcr" accept="image/*" style="display:none" multiple/>
+    </div>
+  </div>
+
+  <div id="gotoLista" style="display:none;padding:0 16px;">
+    <button id="btnGotoLista" class="btn btn-secondary">Przejdź do listy gości →</button>
+  </div>
+</div>
+
+<div class="screen" id="s-lista">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Lista gości</div>
+      <div class="topbar-sub" id="listaSubtitle">Brak gości</div>
+    </div>
+  </div>
+  <div id="listaEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+    <div style="font-size:48px;margin-bottom:12px;">👥</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text2);">Brak gości</div>
+    <div style="font-size:14px;margin-top:6px;">Wklej dane lub użyj skanera</div>
+  </div>
+  <div id="listaFilled" style="display:none;">
+    <div id="guestCards"></div>
+    <div id="listaErr" class="alert alert-warn" style="display:none;margin:0 16px 10px;"></div>
+    <div style="padding:0 16px 4px;">
+      <button id="btnGoExport" class="btn btn-primary">Eksportuj plik →</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-eksport">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Eksport</div>
+      <div class="topbar-sub">Plik Ross1000 TXT v.4</div>
+    </div>
+  </div>
+  <div id="eksportEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+    <div style="font-size:48px;margin-bottom:12px;">💾</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text2);">Brak danych</div>
+  </div>
+  <div id="eksportFilled" style="display:none;">
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Podsumowanie</div>
+      <div id="expSummary" style="font-size:14px;line-height:2;"></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:10px;text-transform:uppercase;letter-spacing:.5px;">Podgląd rekordu #1</div>
+      <div class="code-block" id="expPreview">—</div>
+    </div>
+    <div class="card" style="font-size:13px;color:var(--text2);line-height:1.9;border-left:3px solid var(--gold);">
+      <b style="color:var(--text);">Jak wgrać do Ross1000:</b><br/>
+      1. Pobierz plik poniżej<br/>
+      2. Zaloguj na <span style="color:var(--gold);">ross1000.regione.liguria.it</span><br/>
+      3. Check-in → <span style="color:var(--gold);">Importa file da gestionale</span><br/>
+      4. Wybierz plik .txt → zatwierdź
+    </div>
+    <div style="padding:0 16px 4px;">
+      <button id="btnDownload" class="btn btn-primary mb8">↓ Pobierz plik .txt</button>
+    </div>
+    <div id="dlOk" class="alert alert-ok" style="display:none;margin:0 16px;"></div>
+    <div id="dlFallback" style="display:none;padding:0 16px;">
+      <div class="card-sm mt8">
+        <div style="font-size:12px;color:var(--gold2);margin-bottom:8px;font-weight:600;">📋 Skopiuj zawartość → zapisz jako .txt</div>
+        <textarea id="dlTxt" class="inp" rows="5" style="font-size:10px;font-family:'SF Mono','Menlo',monospace;border-radius:10px;" readonly onclick="this.select()"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" id="nb-dane">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+    Dane
+  </button>
+  <button class="nav-btn" id="nb-skan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M6 7h.01M10 7h4"/></svg>
+    Skan
+  </button>
+  <button class="nav-btn" id="nb-lista">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Lista
+  </button>
+  <button class="nav-btn" id="nb-eksport">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Eksport
+  </button>
+</nav>
+
+<div class="overlay" id="overlaySettings" onclick="if(event.target===this)closeSettings()">
+  <div class="overlay-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Ustawienia</div>
+    <div class="sheet-sub">La Luna Bastremoli · L10046 · FOLLO</div>
+
+    <div class="alert alert-info mb12">
+      <div style="font-weight:600;margin-bottom:6px;">Google Gemini API — bezpłatny</div>
+      <div style="font-size:13px;">15 skanów/min · bez limitu miesięcznego · bez karty kredytowej</div>
+      <div style="font-size:13px;margin-top:6px;">Klucz: <b>aistudio.google.com/apikey</b><br/>Zaloguj Google → Create API key → skopiuj</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-lbl">Klucz Google Gemini API</label>
+      <input id="inpApiKey" class="inp" type="password" placeholder="AIzaSy..." autocomplete="off"/>
+    </div>
+    <button id="btnSaveKey" class="btn btn-primary mb12">Zapisz klucz</button>
+    <div id="keySaved" class="alert alert-ok" style="display:none;margin-bottom:12px;">✓ Klucz zapisany</div>
+
+    <div class="alert alert-warn" style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:6px;">📲 Instalacja jako aplikacja</div>
+      <div style="font-size:13px;line-height:1.8;">
+        Wgraj plik na <b>GitHub Pages</b> (darmowe) i otwórz z adresu HTTPS.<br/>
+        Chrome → Menu ⋮ → <b>Dodaj do ekranu głównego</b> → <b>Zainstaluj</b>
+      </div>
+    </div>
+
+    <button id="btnCloseSettings" class="btn btn-secondary">Zamknij</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+var DM={à:"a",á:"a",â:"a",ã:"a",ä:"a",å:"a",æ:"ae",è:"e",é:"e",ê:"e",ë:"e",ì:"i",í:"i",î:"i",ï:"i",ò:"o",ó:"o",ô:"o",õ:"o",ö:"o",ø:"o",ù:"u",ú:"u",û:"u",ü:"u",ý:"y",ÿ:"y",ñ:"n",ç:"c",ß:"ss",ł:"l",ń:"n",ś:"s",ź:"z",ż:"z",ć:"c",ę:"e",ą:"a",œ:"oe",À:"A",Á:"A",Â:"A",Ã:"A",Ä:"A",Å:"A",Æ:"AE",È:"E",É:"E",Ê:"E",Ë:"E",Ì:"I",Í:"I",Î:"I",Ï:"I",Ò:"O",Ó:"O",Ô:"O",Õ:"O",Ö:"O",Ø:"O",Ù:"U",Ú:"U",Û:"U",Ü:"U",Ý:"Y",Ñ:"N",Ç:"C",Ł:"L",Ń:"N",Ś:"S",Ź:"Z",Ż:"Z",Ć:"C",Ę:"E",Ą:"A",Œ:"OE"};
+function san(s){return String(s||"").split("").map(function(c){return DM[c]||c;}).join("").replace(/[^A-Za-z0-9\s\-'.\/]/g,"").replace(/\s+/g," ").trim().toUpperCase();}
+
+var NC={"SVIZZERA":"100000100","SUISSE":"100000100","SWITZERLAND":"100000100","SCHWEIZ":"100000100","CHE":"100000100","FRANCE":"100000060","FRANCIA":"100000060","FRANKREICH":"100000060","FRA":"100000060","ITALIA":"100000073","ITALY":"100000073","ITALIE":"100000073","ITALIEN":"100000073","ITA":"100000073","GERMANY":"100000065","GERMANIA":"100000065","DEUTSCHLAND":"100000065","ALLEMAGNE":"100000065","DEU":"100000065","AUSTRIA":"100000014","OSTERREICH":"100000014","AUTRICHE":"100000014","AUT":"100000014","SPAIN":"100000109","SPAGNA":"100000109","ESPAGNE":"100000109","ESP":"100000109","BELGIUM":"100000017","BELGIO":"100000017","BELGIQUE":"100000017","BEL":"100000017","POLAND":"100000087","POLONIA":"100000087","POLOGNE":"100000087","POLSKA":"100000087","POL":"100000087","UNITED KINGDOM":"100000123","UK":"100000123","REGNO UNITO":"100000123","GBR":"100000123","ENGLAND":"100000123","NETHERLANDS":"100000079","PAESI BASSI":"100000079","NEDERLAND":"100000079","NLD":"100000079","HOLLAND":"100000079","PORTUGAL":"100000088","PORTOGALLO":"100000088","PRT":"100000088","SWEDEN":"100000113","SVEZIA":"100000113","SVERIGE":"100000113","SWE":"100000113","NORWAY":"100000082","NORVEGIA":"100000082","NORGE":"100000082","NOR":"100000082","DENMARK":"100000038","DANIMARCA":"100000038","DANMARK":"100000038","DNK":"100000038","FINLAND":"100000059","FINLANDIA":"100000059","SUOMI":"100000059","FIN":"100000059","USA":"100000130","STATI UNITI":"100000130","UNITED STATES":"100000130","UNITED STATES OF AMERICA":"100000130","US":"100000130","CANADA":"100000025","CAN":"100000025","AUSTRALIA":"100000010","AUS":"100000010","JAPAN":"100000074","GIAPPONE":"100000074","JAPON":"100000074","NIPPON":"100000074","JPN":"100000074","CHINA":"100000031","CINA":"100000031","CHINE":"100000031","CHN":"100000031","BRAZIL":"100000022","BRASILE":"100000022","BRASIL":"100000022","BRESIL":"100000022","BRA":"100000022","RUSSIA":"100000099","RUSSIE":"100000099","RUS":"100000099","TURKEY":"100000121","TURCHIA":"100000121","TURQUIE":"100000121","TURKIYE":"100000121","TUR":"100000121","GREECE":"100000067","GRECIA":"100000067","GRECE":"100000067","GRC":"100000067","ROMANIA":"100000097","ROUMANIE":"100000097","ROU":"100000097","MOROCCO":"100000075","MAROCCO":"100000075","MAROC":"100000075","MAR":"100000075","CZECH REPUBLIC":"100000034","CECHIA":"100000034","CZECHIA":"100000034","CZE":"100000034","HUNGARY":"100000070","UNGHERIA":"100000070","HONGRIE":"100000070","HUN":"100000070","CROATIA":"100000039","CROAZIA":"100000039","HRVATSKA":"100000039","HRV":"100000039","ARGENTINA":"100000008","ARGENTINE":"100000008","ARG":"100000008","INDIA":"100000071","INDE":"100000071","IND":"100000071","MEXICO":"100000076","MESSICO":"100000076","MEXIQUE":"100000076","MEX":"100000076","SOUTH KOREA":"100000078","COREA DEL SUD":"100000078","KOR":"100000078","SINGAPORE":"100000107","SGP":"100000107","NEW ZEALAND":"100000080","NUOVA ZELANDA":"100000080","NZL":"100000080","SOUTH AFRICA":"100000108","SUDAFRICA":"100000108","ZAF":"100000108","UKRAINE":"100000122","UCRAINA":"100000122","UKR":"100000122","SLOVAKIA":"100000106","SLOVACCHIA":"100000106","SVK":"100000106","SLOVENIA":"100000105","SLOVENIE":"100000105","SVN":"100000105","SERBIA":"100000103","SERBIE":"100000103","SRB":"100000103","BULGARIA":"100000023","BULGARIE":"100000023","BGR":"100000023","LITHUANIA":"100000063","LITUANIA":"100000063","LTU":"100000063","LATVIA":"100000057","LETTONIA":"100000057","LVA":"100000057","ESTONIA":"100000051","EST":"100000051","LUXEMBOURG":"100000064","LUSSEMBURGO":"100000064","LUX":"100000064","IRELAND":"100000072","IRLANDA":"100000072","IRL":"100000072","ICELAND":"100000070","ISLANDA":"100000070","ISL":"100000070","ALBANIA":"100000002","ALB":"100000002","EGYPT":"100000046","EGITTO":"100000046","EGY":"100000046","TUNISIA":"100000120","TUN":"100000120","ALGERIA":"100000003","DZA":"100000003","COLOMBIA":"100000033","COL":"100000033","CHILE":"100000030","CILE":"100000030","CHL":"100000030","PERU":"100000086","PER":"100000086","THAILAND":"100000117","TAILANDIA":"100000117","THA":"100000117","VIETNAM":"100000133","VNM":"100000133","PHILIPPINES":"100000085","FILIPPINE":"100000085","PHL":"100000085","MALAYSIA":"100000075","MYS":"100000075","TAIWAN":"100000114","TWN":"100000114","HONG KONG":"100000069","HKG":"100000069","SAUDI ARABIA":"100000102","ARABIA SAUDITA":"100000102","SAU":"100000102","UNITED ARAB EMIRATES":"100000124","EMIRATI ARABI":"100000124","UAE":"100000124","ARE":"100000124","PAKISTAN":"100000084","PAK":"100000084","ANDORRA":"100000005","AND":"100000005","MONACO":"100000077","MCO":"100000077","SAN MARINO":"100000101","SMR":"100000101","LIECHTENSTEIN":"100000062","LIE":"100000062","MALTA":"100000074","MLT":"100000074","CYPRUS":"100000035","CIPRO":"100000035","CYP":"100000035","ISRAEL":"100000073","ISRAELE":"100000073","ISR":"100000073","BOSNIA":"100000020","BOSNIA ERZEGOVINA":"100000020","BIH":"100000020","MONTENEGRO":"100000078","MNE":"100000078","NORTH MACEDONIA":"100000076","MACEDONIA":"100000076","MKD":"100000076","BELARUS":"100000016","BIELORUSSIA":"100000016","BLR":"100000016","MOLDOVA":"100000077","MDA":"100000077","GEORGIA":"100000064","GEO":"100000064","ARMENIA":"100000009","ARM":"100000009","AZERBAIJAN":"100000013","AZE":"100000013","KAZAKHSTAN":"100000077","KAZ":"100000077","CUBA":"100000041","CUB":"100000041","DOMINICAN REPUBLIC":"100000044","REPUBBLICA DOMINICANA":"100000044","DOM":"100000044","ECUADOR":"100000045","ECU":"100000045","BOLIVIA":"100000019","BOL":"100000019","PARAGUAY":"100000085","PRY":"100000085","URUGUAY":"100000128","URY":"100000128","COSTA RICA":"100000037","CRI":"100000037","VENEZUELA":"100000132","VEN":"100000132","NIGERIA":"100000081","NGA":"100000081","KENYA":"100000077","KEN":"100000077","ETHIOPIA":"100000052","ETH":"100000052","GHANA":"100000066","GHA":"100000066","SENEGAL":"100000104","SEN":"100000104","INDONESIA":"100000071","IDN":"100000071","IRAN":"100000072","IRN":"100000072","BANGLADESH":"100000015","BGD":"100000015","SRI LANKA":"100000110","LKA":"100000110"};
+var CM={"suisse":"SVIZZERA","switzerland":"SVIZZERA","schweiz":"SVIZZERA","svizzera":"SVIZZERA","che":"SVIZZERA","france":"FRANCE","frankreich":"FRANCE","francia":"FRANCE","fra":"FRANCE","italia":"ITALIA","italy":"ITALIA","italie":"ITALIA","italien":"ITALIA","ita":"ITALIA","germany":"GERMANY","deutschland":"GERMANY","allemagne":"GERMANY","germania":"GERMANY","deu":"GERMANY","osterreich":"AUSTRIA","austria":"AUSTRIA","autriche":"AUSTRIA","aut":"AUSTRIA","spain":"SPAIN","espagne":"SPAIN","espana":"SPAIN","spagna":"SPAIN","esp":"SPAIN","espana":"SPAIN","belgium":"BELGIUM","belgique":"BELGIUM","belgio":"BELGIUM","belgien":"BELGIUM","bel":"BELGIUM","poland":"POLAND","pologne":"POLAND","polska":"POLAND","polonia":"POLAND","pol":"POLAND","united kingdom":"UNITED KINGDOM","uk":"UNITED KINGDOM","grande-bretagne":"UNITED KINGDOM","gbr":"UNITED KINGDOM","england":"UNITED KINGDOM","netherlands":"NETHERLANDS","nederland":"NETHERLANDS","pays-bas":"NETHERLANDS","nld":"NETHERLANDS","holland":"NETHERLANDS","portugal":"PORTUGAL","portogallo":"PORTUGAL","prt":"PORTUGAL","sweden":"SWEDEN","svezia":"SWEDEN","suede":"SWEDEN","sverige":"SWEDEN","swe":"SWEDEN","norway":"NORWAY","norvegia":"NORWAY","nor":"NORWAY","norge":"NORWAY","denmark":"DENMARK","danimarca":"DENMARK","dnk":"DENMARK","danmark":"DENMARK","finland":"FINLAND","finlandia":"FINLAND","fin":"FINLAND","suomi":"FINLAND","usa":"USA","united states":"USA","etats-unis":"USA","stati uniti":"USA","united states of america":"USA","us":"USA","canada":"CANADA","can":"CANADA","australia":"AUSTRALIA","aus":"AUSTRALIA","japan":"JAPAN","japon":"JAPAN","giappone":"JAPAN","jpn":"JAPAN","nippon":"JAPAN","china":"CHINA","chine":"CHINA","cina":"CHINA","chn":"CHINA","brazil":"BRAZIL","bresil":"BRAZIL","brasile":"BRAZIL","brasil":"BRAZIL","bra":"BRAZIL","russia":"RUSSIA","rus":"RUSSIA","russie":"RUSSIA","turkey":"TURKEY","turchia":"TURKEY","tur":"TURKEY","turquie":"TURKEY","turkiye":"TURKEY","greece":"GREECE","grecia":"GREECE","grc":"GREECE","grece":"GREECE","romania":"ROMANIA","rou":"ROMANIA","roumanie":"ROMANIA","morocco":"MOROCCO","marocco":"MOROCCO","mar":"MOROCCO","maroc":"MOROCCO","czech republic":"CZECH REPUBLIC","cechia":"CZECH REPUBLIC","czechia":"CZECH REPUBLIC","cze":"CZECH REPUBLIC","hungary":"HUNGARY","ungheria":"HUNGARY","hun":"HUNGARY","hongrie":"HUNGARY","croatia":"CROATIA","croazia":"CROATIA","hrv":"CROATIA","hrvatska":"CROATIA","argentina":"ARGENTINA","arg":"ARGENTINA","argentine":"ARGENTINA","india":"INDIA","ind":"INDIA","inde":"INDIA","mexico":"MEXICO","messico":"MEXICO","mexique":"MEXICO","mex":"MEXICO","south korea":"SOUTH KOREA","corea del sud":"SOUTH KOREA","kor":"SOUTH KOREA","singapore":"SINGAPORE","sgp":"SINGAPORE","new zealand":"NEW ZEALAND","nuova zelanda":"NEW ZEALAND","nzl":"NEW ZEALAND","south africa":"SOUTH AFRICA","sudafrica":"SOUTH AFRICA","zaf":"SOUTH AFRICA","ukraine":"UKRAINE","ucraina":"UKRAINE","ukr":"UKRAINE","slovakia":"SLOVAKIA","slovacchia":"SLOVAKIA","svk":"SLOVAKIA","slovenia":"SLOVENIA","slovenie":"SLOVENIA","svn":"SLOVENIA","serbia":"SERBIA","serbie":"SERBIA","srb":"SERBIA","bulgaria":"BULGARIA","bulgarie":"BULGARIA","bgr":"BULGARIA","lithuania":"LITHUANIA","lituania":"LITHUANIA","ltu":"LITHUANIA","latvia":"LATVIA","lettonia":"LATVIA","lva":"LATVIA","estonia":"ESTONIA","est":"ESTONIA","luxembourg":"LUXEMBOURG","lussemburgo":"LUXEMBOURG","lux":"LUXEMBOURG","ireland":"IRELAND","irlanda":"IRELAND","irl":"IRELAND","iceland":"ICELAND","islanda":"ICELAND","isl":"ICELAND","albania":"ALBANIA","alb":"ALBANIA","egypt":"EGYPT","egitto":"EGYPT","egy":"EGYPT","tunisia":"TUNISIA","tun":"TUNISIA","algeria":"ALGERIA","dza":"ALGERIA","colombia":"COLOMBIA","col":"COLOMBIA","chile":"CHILE","cile":"CHILE","chl":"CHILE","peru":"PERU","per":"PERU","thailand":"THAILAND","tailandia":"THAILAND","tha":"THAILAND","vietnam":"VIETNAM","vnm":"VIETNAM","philippines":"PHILIPPINES","filippine":"PHILIPPINES","phl":"PHILIPPINES","malaysia":"MALAYSIA","mys":"MALAYSIA","taiwan":"TAIWAN","twn":"TAIWAN","hong kong":"HONG KONG","hkg":"HONG KONG","saudi arabia":"SAUDI ARABIA","arabia saudita":"SAUDI ARABIA","sau":"SAUDI ARABIA","united arab emirates":"UNITED ARAB EMIRATES","emirati arabi":"UNITED ARAB EMIRATES","uae":"UNITED ARAB EMIRATES","are":"UNITED ARAB EMIRATES","pakistan":"PAKISTAN","pak":"PAKISTAN","andorra":"ANDORRA","and":"ANDORRA","monaco":"MONACO","mco":"MONACO","san marino":"SAN MARINO","smr":"SAN MARINO","liechtenstein":"LIECHTENSTEIN","lie":"LIECHTENSTEIN","malta":"MALTA","mlt":"MALTA","cyprus":"CYPRUS","cipro":"CYPRUS","cyp":"CYPRUS","israel":"ISRAEL","israele":"ISRAEL","isr":"ISRAEL","bosnia":"BOSNIA","bosnia erzegovina":"BOSNIA","bih":"BOSNIA","montenegro":"MONTENEGRO","mne":"MONTENEGRO","north macedonia":"NORTH MACEDONIA","macedonia":"NORTH MACEDONIA","mkd":"NORTH MACEDONIA","belarus":"BELARUS","bielorussia":"BELARUS","blr":"BELARUS","moldova":"MOLDOVA","mda":"MOLDOVA","georgia":"GEORGIA","geo":"GEORGIA","armenia":"ARMENIA","arm":"ARMENIA","azerbaijan":"AZERBAIJAN","aze":"AZERBAIJAN","cuba":"CUBA","cub":"CUBA","dominican republic":"DOMINICAN REPUBLIC","repubblica dominicana":"DOMINICAN REPUBLIC","dom":"DOMINICAN REPUBLIC","ecuador":"ECUADOR","ecu":"ECUADOR","bolivia":"BOLIVIA","bol":"BOLIVIA","paraguay":"PARAGUAY","pry":"PARAGUAY","uruguay":"URUGUAY","ury":"URUGUAY","costa rica":"COSTA RICA","cri":"COSTA RICA","venezuela":"VENEZUELA","ven":"VENEZUELA","nigeria":"NIGERIA","nga":"NIGERIA","kenya":"KENYA","ken":"KENYA","ethiopia":"ETHIOPIA","eth":"ETHIOPIA","ghana":"GHANA","gha":"GHANA","senegal":"SENEGAL","sen":"SENEGAL","indonesia":"INDONESIA","idn":"INDONESIA","iran":"IRAN","irn":"IRAN","bangladesh":"BANGLADESH","bgd":"BANGLADESH","sri lanka":"SRI LANKA","lka":"SRI LANKA","kazakhstan":"KAZAKHSTAN","kaz":"KAZAKHSTAN"};
+function normC(r){var k=String(r||"").toLowerCase().trim().replace(/[éèêë]/g,"e").replace(/[àâ]/g,"a").replace(/[ùû]/g,"u").replace(/œ/g,"oe").replace(/ü/g,"u").replace(/ö/g,"o").replace(/ä/g,"a").replace(/ß/g,"ss");return CM[k]||san(r).toUpperCase();}
+function isIT(r){return["italia","italy","italie","italien","ita"].indexOf(String(r||"").toLowerCase().trim())>=0;}
+function getNC(c){return NC[String(c||"").toUpperCase()]||"000000000";}
+function uid(){return Math.random().toString(36).slice(2);}
+
+function parseDt(r){var s=String(r||"").trim().replace(/[\/\-]/g,".");var m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m)return m[1].padStart(2,"0")+"/"+m[2].padStart(2,"0")+"/"+m[3];var m2=String(r||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);if(m2)return m2[3]+"/"+m2[2]+"/"+m2[1];return r||"";}
+function todayStr(){var d=new Date();return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();}
+function addDays(ds,n){try{var p=(ds||todayStr()).split("/");var d=new Date(+p[2],+p[1]-1,+p[0]);d.setDate(d.getDate()+Number(n||1));return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();}catch(e){return "";}}
+function recalcDep(){var arr=document.getElementById("inpArr").value;var n=document.getElementById("inpNights").value;document.getElementById("dispDep").textContent=(arr&&n)?addDays(arr,n):"—";}
+
+function normGender(r){
+  var k=String(r||"").toLowerCase().trim();
+  var M=["m","masculin","masculino","male","maschile","mannlich","homme","maschio","meczyzna","mezczyzna","man","uomo","herr","monsieur","senor","mand","mann","mies","muz","barbat","hombre"];
+  var F=["f","feminin","feminino","female","femminile","weiblich","femme","femmina","kobieta","donna","frau","madame","senora","kvinde","kvinne","nainen","zena","femeie","mujer","w","k"];
+  if(M.indexOf(k)>=0)return"M";
+  if(F.indexOf(k)>=0)return"F";
+  if(/^m[aä]nn/i.test(k)||/^masc/i.test(k))return"M";
+  if(/^f[eé]m/i.test(k)||/^femm/i.test(k))return"F";
+  return null;
+}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+var guests=[];
+var ocrGender="";
+var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+var SCREENS=["dane","skan","lista","eksport"];
+function showScreen(name){
+  SCREENS.forEach(function(s){
+    document.getElementById("s-"+s).classList.remove("active");
+    document.getElementById("nb-"+s).classList.remove("active");
+    document.getElementById("s-"+s).scrollTop=0;
+  });
+  document.getElementById("s-"+name).classList.add("active");
+  document.getElementById("nb-"+name).classList.add("active");
+  if(name==="lista")renderLista();
+  if(name==="eksport")renderExport();
+  if(name==="skan")updateKeyStatus();
+}
+SCREENS.forEach(function(s){
+  document.getElementById("nb-"+s).addEventListener("click",function(){showScreen(s);});
+});
+
+// ═══════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════
+function openSettings(){document.getElementById("inpApiKey").value=getApiKey();document.getElementById("overlaySettings").style.display="block";}
+function closeSettings(){document.getElementById("overlaySettings").style.display="none";updateKeyStatus();}
+document.getElementById("btnSettings").addEventListener("click",openSettings);
+document.getElementById("btnCloseSettings").addEventListener("click",closeSettings);
+document.getElementById("btnSaveKey").addEventListener("click",function(){
+  var k=document.getElementById("inpApiKey").value.trim();
+  if(!k){alert("Podaj klucz API");return;}
+  localStorage.setItem("r1000_key",k);
+  document.getElementById("keySaved").style.display="block";
+  setTimeout(function(){document.getElementById("keySaved").style.display="none";},2500);
+  updateKeyStatus();
+});
+function getApiKey(){return localStorage.getItem("r1000_key")||"";}
+function updateKeyStatus(){
+  var k=getApiKey();
+  var dot=document.getElementById("keyDot");
+  var txt=document.getElementById("keyTxt");
+  if(k){dot.className="dot dot-gold";txt.textContent="Gemini ✓";}
+  else{dot.className="dot dot-red";txt.textContent="Brak klucza";}
+}
+
+// ═══════════════════════════════════════
+// DATES
+// ═══════════════════════════════════════
+document.getElementById("inpArr").addEventListener("input",recalcDep);
+document.getElementById("inpNights").addEventListener("input",recalcDep);
+
+// ═══════════════════════════════════════
+// TEXT PARSER
+// ═══════════════════════════════════════
+document.getElementById("btnProcess").addEventListener("click",function(){
+  var text=document.getElementById("taGuests").value.trim();
+  if(!text){alert("Wklej dane gości");return;}
+  var gtype=document.getElementById("selGtype").value;
+  var blocks=text.split(/\n[ \t]*\n+/).map(function(b){return b.trim();}).filter(Boolean);
+  guests=[];
+  for(var bi=0;bi<blocks.length;bi++){
+    var lines=blocks[bi].split("\n").map(function(l){return l.trim();}).filter(Boolean);
+    if(!lines.length)continue;
+    var fn="",ln="",gender=null,dob="",isLeader=false,countries=[];
+    var nl=lines[0];
+    if(/\/(responsable|leader|capogruppo|lider|référent|verantwortlich)/i.test(nl))isLeader=true;
+    var cleanName=nl.replace(/\s*\/.*$/,"").replace(/[▲•◄►▸▴△\*]+/g,"").trim();
+    var pts=cleanName.split(/\s+/);ln=pts.pop()||"";fn=pts.join(" ")||"";
+    for(var j=1;j<lines.length;j++){
+      var l=lines[j];
+      var dm=l.match(/\b(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})\b/);
+      if(dm&&!dob){dob=parseDt(dm[0]);continue;}
+      var gv=normGender(l);
+      if(gv&&!gender){gender=gv;continue;}
+      if(l.length>2&&!dm&&!gv&&!/^(nr|num|doc|pass|id|carte|ausweis|perm)/i.test(l))countries.push(l);
+    }
+    var cit=countries[0]||"";
+    var citN=normC(cit);
+    var birthN=normC(countries[1]||cit)||citN;
+    var residN=normC(countries[2]||cit)||citN;
+    guests.push({id:uid(),firstName:san(fn),lastName:san(ln),rawFirst:fn,rawLast:ln,gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),isLeader:isLeader,gtype:gtype,docType:"",docNumber:"",role:isLeader?"Capogruppo":"Membro"});
+  }
+  if(guests.length>0&&!guests.some(function(x){return x.isLeader;})){guests[0].isLeader=true;guests[0].role="Capogruppo";}
+  showScreen("lista");
+});
+
+// ═══════════════════════════════════════
+// OCR — QUEUE
+// ═══════════════════════════════════════
+var ocrQueue=[];
+var ocrProcessing=false;
+
+function setOcrGender(g){
+  ocrGender=g;
+  document.getElementById("gBtnM").className="gender-btn"+(g==="M"?" on":"");
+  document.getElementById("gBtnF").className="gender-btn"+(g==="F"?" on":"");
+}
+document.getElementById("gBtnM").addEventListener("click",function(){setOcrGender("M");});
+document.getElementById("gBtnF").addEventListener("click",function(){setOcrGender("F");});
+document.getElementById("oDocNum").addEventListener("input",function(){this.value=this.value.toUpperCase();});
+
+function processOcrQueue(){
+  if(ocrProcessing||!ocrQueue.length)return;
+  ocrProcessing=true; // Ustawiamy flagę
+  var file=ocrQueue.shift();
+  runOcr(file,function(){
+    ocrProcessing=false;
+  });
+}
+
+function addToQueue(files){
+  for(var i=0;i<files.length;i++)ocrQueue.push(files[i]);
+  document.getElementById("uploadZoneWrap").style.display="none";
+  if(!ocrProcessing) {
+    processOcrQueue();
+  }
+}
+
+function runOcr(file,onDone){
+  var apiKey=getApiKey();
+  if(!apiKey){openSettings();onDone();return;}
+  
+  // Reset pól
+  document.getElementById("oLast").value="";
+  document.getElementById("oFirst").value="";
+  document.getElementById("oDob").value="";
+  document.getElementById("oNat").value="";
+  document.getElementById("oBirth").value="";
+  document.getElementById("oResid").value="";
+  document.getElementById("oDocType").value="";
+  document.getElementById("oDocNum").value="";
+  setOcrGender("");
+
+  document.getElementById("ocrResult").style.display="none";
+  document.getElementById("ocrErr").style.display="none";
+  document.getElementById("ocrStatus").style.display="block";
+  document.getElementById("ocrStatusTxt").textContent="Analizuję...";
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var b64=e.target.result.split(",")[1];
+    var mt=file.type||"image/jpeg";
+    if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
+    
+    var prompt="Analyze this identity document image. Return ONLY a raw JSON object, no markdown, no extra text.\n{\"lastName\":\"surname as printed\",\"firstName\":\"given name(s) as printed\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"standard English country name: Switzerland/France/Germany/Poland/Italy/Austria/Spain/Belgium/Netherlands/United Kingdom/USA/Canada/Australia/Japan/China/Brazil etc\",\"birthCountry\":\"ONLY if different from nationality. If same country: empty string.\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE\",\"docNumber\":\"exact document number as printed\"}\nIMPORTANT: Always use ONE consistent English country name. Deutschland=Germany, Polska=Poland, Suisse=Switzerland, Italia=Italy, Espana=Spain. Never mix languages. birthCountry must be empty string if it equals nationality.";
+    
+    // Używamy TYLKO stabilnego modelu Lite
+    fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        contents:[{parts:[{inlineData:{mime_type:mt,data:b64}},{text:prompt}]}],
+        generationConfig:{maxOutputTokens:400,temperature:0,responseMimeType:"application/json"}
+      })
+    })
+    .then(function(r){if(!r.ok)return r.json().then(function(e){throw new Error((e.error&&e.error.message)||"HTTP "+r.status);});return r.json();})
+    .then(function(data){
+      document.getElementById("ocrStatus").style.display="none";
+      var parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+      var txt=parts.map(function(x){return x.text||"";}).join("").trim();
+      txt=txt.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/```$/,"").trim();
+      var m=txt.match(/\{[\s\S]*\}/);
+      if(!m)throw new Error("Brak danych w odpowiedzi");
+      var p=JSON.parse(m[0]);
+      
+      document.getElementById("oLast").value=san(p.lastName||"");
+      document.getElementById("oFirst").value=san(p.firstName||"");
+      document.getElementById("oDob").value=p.dateOfBirth||"";
+      document.getElementById("oNat").value=san(p.nationality||"");
+      document.getElementById("oBirth").value=san(p.birthCountry||"");
+      document.getElementById("oDocType").value=p.docType||"";
+      document.getElementById("oDocNum").value=san(p.docNumber||"");
+      setOcrGender(p.gender||"");
+      
+      document.getElementById("ocrResult").style.display="block";
+      refreshOcrBtns();
+      onDone();
+    })
+    .catch(function(err){
+      document.getElementById("ocrStatus").style.display="none";
+      document.getElementById("ocrErr").style.display="block";
+      document.getElementById("ocrErr").innerHTML="✗ "+err.message;
+      onDone();
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function refreshOcrBtns(){}
+
+document.getElementById("btnOcrNew").addEventListener("click",function(){applyOcr(null);});
+
+function applyOcr(guestId){
+  // Jeśli jesteśmy w trybie edycji, użyj editingGuestId
+  var targetId = guestId || editingGuestId;
+  var gtype=document.getElementById("selGtype").value;
+  var nat=document.getElementById("oNat").value;
+  var birth=document.getElementById("oBirth").value||nat;
+  var resid=document.getElementById("oResid").value||nat;
+
+  var natC = normC(nat);
+  var birthC = normC(birth);
+  var resC = normC(resid);
+  
+  birthC = (birthC === natC) ? "" : birthC;
+  resC = (resC === natC) ? "" : resC;
+  
+  var isFirst = (guests.length === 0 && !targetId);
+  // Dla edycji: zachowaj isLeader gościa, dla nowego: isFirst
+  var existingGuest = targetId ? guests.find(function(x){return x.id===targetId;}) : null;
+  var isLeaderVal = existingGuest ? existingGuest.isLeader : isFirst;
+  
+  var up={
+    lastName:san(document.getElementById("oLast").value),
+    firstName:san(document.getElementById("oFirst").value),
+    dob:parseDt(document.getElementById("oDob").value),
+    gender:ocrGender,
+    cit:natC,
+    birthC:birthC,
+    residC:resC,
+    isItaly:isIT(nat),
+    docType:isLeaderVal ? document.getElementById("oDocType").value : "",
+    docNumber:isLeaderVal ? san(document.getElementById("oDocNum").value) : ""
+  };
+  
+  if(targetId){
+    for(var i=0;i<guests.length;i++){if(guests[i].id===targetId){Object.assign(guests[i],up);break;}}
+  } else {
+    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,role:isFirst?"Capogruppo":"Membro"});
+  }
+
+  // Reset trybu edycji
+  editingGuestId = null;
+  var btnNew = document.getElementById("btnOcrNew");
+  btnNew.textContent = "＋ Dodaj jako nowy gość";
+  btnNew.style.background = "";
+  
+  document.getElementById("ocrResult").style.display="none";
+  document.getElementById("gotoLista").style.display="block";
+  document.getElementById("btnGotoLista").textContent="Lista gości ("+guests.length+") →";
+  
+  if(ocrQueue.length > 0) {
+    processOcrQueue();
+  } else {
+    document.getElementById("uploadZoneWrap").style.display="block";
+  }
+}
+
+document.getElementById("btnGotoLista").addEventListener("click",function(){showScreen("lista");});
+document.getElementById("inpOcr").addEventListener("change",function(){if(this.files.length)addToQueue(this.files);this.value="";});
+document.getElementById("inpOcr2").addEventListener("change",function(){if(this.files.length)addToQueue(this.files);this.value="";});
+
+var dz=document.getElementById("dropZone");
+dz.addEventListener("dragover",function(e){e.preventDefault();dz.classList.add("drag");});
+dz.addEventListener("dragleave",function(){dz.classList.remove("drag");});
+dz.addEventListener("drop",function(e){e.preventDefault();dz.classList.remove("drag");if(e.dataTransfer.files.length)addToQueue(e.dataTransfer.files);});
+
+
+// ═══════════════════════════════════════
+// LISTA
+// ═══════════════════════════════════════
+function renderLista(){
+  var empty=document.getElementById("listaEmpty");
+  var filled=document.getElementById("listaFilled");
+  var sub=document.getElementById("listaSubtitle");
+  if(!guests.length){empty.style.display="block";filled.style.display="none";sub.textContent="Brak gości";return;}
+  empty.style.display="none";filled.style.display="block";
+  var arr=document.getElementById("inpArr").value;
+  var dep=document.getElementById("dispDep").textContent;
+  sub.textContent=guests.length+" gości · "+arr+" → "+dep;
+  var errs=[];
+  var leader=null;for(var i=0;i<guests.length;i++){if(guests[i].isLeader){leader=guests[i];break;}}
+  if(!arr)errs.push("Brak daty przyjazdu");
+  if(leader&&!leader.docType)errs.push("Brak typu dokumentu Capogruppo");
+  if(leader&&!leader.docNumber)errs.push("Brak numeru dokumentu Capogruppo");
+  for(var i=0;i<guests.length;i++){if(!guests[i].dob){errs.push("Brak daty urodzenia u niektórych gości");break;}}
+  var errDiv=document.getElementById("listaErr");
+  if(errs.length){errDiv.style.display="block";errDiv.innerHTML="⚠ "+errs.join("<br/>⚠ ");}
+  else errDiv.style.display="none";
+  document.getElementById("btnGoExport").disabled=errs.length>0;
+
+  var html="";
+  for(var i=0;i<guests.length;i++){
+    var g=guests[i];var mis=g.isLeader&&(!g.docType||!g.docNumber);
+    html+='<div class="guest-card'+(g.isLeader?" leader":"")+'"><div class="row-between mb8"><div class="row gap-s"><span class="badge '+(g.isLeader?"badge-gold":"badge-blue")+'">'+(g.role)+'</span><span class="guest-name">'+g.lastName+' '+g.firstName+'</span></div></div>';
+    html+='<div class="guest-meta">';
+    html+=(g.dob?'📅 '+g.dob:'<span style="color:var(--red)">⚠ Brak daty</span>');
+    html+=' &nbsp;'+(g.gender||'—');
+    html+=' &nbsp;<span style="color:var(--text3);">'+( g.cit||'—')+'</span>';
+    html+='</div>';
+    if(g.isLeader){
+      html+='<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:8px;">';
+      html+='<div style="font-size:11px;color:var(--gold);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Documento</div>';
+      html+='<select class="inp" data-gid="'+g.id+'" data-field="docType" style="font-size:14px;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';">';
+      html+='<option value="">— tipo documento —</option>';
+      var dt=["PASSAPORTO","CARTA D'IDENTITA","PATENTE"];
+      for(var di=0;di<dt.length;di++)html+='<option value="'+dt[di]+'"'+(g.docType===dt[di]?" selected":"")+'>'+dt[di]+'</option>';
+      html+='</select>';
+      html+='<input class="inp" data-gid="'+g.id+'" data-field="docNumber" value="'+(g.docNumber||"")+'" placeholder="Numero documento" style="letter-spacing:2px;font-family:\'SF Mono\',monospace;font-size:14px;text-transform:uppercase;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';" />';
+      html+='</div>';
+    }
+    // Przycisk edycji i usuwania dla KAŻDEGO
+    html += '<div style="margin-top:10px;display:flex;gap:10px;">' +
+      '<button onclick="editGuest(\''+g.id+'\')" class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">✏️ Edytuj</button>' +
+      '<button onclick="removeGuest(\''+g.id+'\')" class="btn btn-danger" style="padding:4px 8px;font-size:12px;">🗑️ Usuń</button>' +
+      '</div>';
+    html+='</div>';
+  }
+  document.getElementById("guestCards").innerHTML=html;
+  document.getElementById("guestCards").querySelectorAll("[data-gid]").forEach(function(el){
+    var ev=el.tagName==="SELECT"?"change":"input";
+    el.addEventListener(ev,function(){var v=this.value;if(this.getAttribute("data-field")==="docNumber")v=v.toUpperCase();for(var i=0;i<guests.length;i++){if(guests[i].id===this.getAttribute("data-gid")){guests[i][this.getAttribute("data-field")]=v;break;}}renderLista();});
+  });
+}
+
+function removeGuest(id) {
+  guests = guests.filter(function(g){ return g.id !== id; });
+  // Jeśli po usunięciu nie ma lidera, pierwszemu przypisz rolę
+  if(guests.length > 0 && !guests.some(function(g){return g.isLeader;})) {
+    guests[0].isLeader = true;
+    guests[0].role = "Capogruppo";
+  }
+  renderLista();
+  // Aktualizuj licznik w zakładce Skan
+  var btn = document.getElementById("btnGotoLista");
+  if(btn) {
+    if(guests.length > 0) {
+      btn.textContent = "Lista gości (" + guests.length + ") →";
+      document.getElementById("gotoLista").style.display = "block";
+    } else {
+      document.getElementById("gotoLista").style.display = "none";
+    }
+  }
+}
+
+var editingGuestId = null;
+
+function editGuest(id) {
+  var g = guests.find(function(x){ return x.id === id; });
+  if(!g) return;
+  editingGuestId = id;
+
+  // Wypełnij wszystkie pola formularza OCR
+  document.getElementById("oLast").value = g.lastName || "";
+  document.getElementById("oFirst").value = g.firstName || "";
+  document.getElementById("oDob").value = g.dob || "";
+  document.getElementById("oNat").value = g.cit || "";
+  document.getElementById("oBirth").value = g.birthC || "";
+  document.getElementById("oResid").value = g.residC || "";
+  document.getElementById("oDocType").value = g.docType || "";
+  document.getElementById("oDocNum").value = g.docNumber || "";
+  setOcrGender(g.gender || "");
+
+  // Pokaż wynik jak po skanowaniu, schowaj upload
+  document.getElementById("ocrResult").style.display = "block";
+  document.getElementById("uploadZoneWrap").style.display = "none";
+  document.getElementById("ocrErr").style.display = "none";
+  document.getElementById("ocrStatus").style.display = "none";
+  if(document.getElementById("ocrQueueInfo"))
+    document.getElementById("ocrQueueInfo").style.display = "none";
+
+  // Zmień przycisk "Dodaj jako nowy" na "Zapisz zmiany"
+  var btnNew = document.getElementById("btnOcrNew");
+  btnNew.textContent = "💾 Zapisz zmiany";
+  btnNew.style.background = "var(--blue, #3b82f6)";
+
+  showScreen("skan");
+}
+
+document.getElementById("btnGoExport").addEventListener("click",function(){showScreen("eksport");});
+
+// ═══════════════════════════════════════
+// TXT GENERATOR
+// ═══════════════════════════════════════
+var DC={"PASSAPORTO":"PASSO","CARTA D'IDENTITA":"IDENT","PATENTE":"PATEN","ALTRO":"ALTRO"};
+function pp(v,len,num){var s=String(v||"").slice(0,len);if(num){while(s.length<len)s="0"+s;}else{while(s.length<len)s=s+" ";}return s;}
+function genTXT(){
+  var arr=document.getElementById("inpArr").value;
+  var dep=addDays(arr,document.getElementById("inpNights").value);
+  var camOcc=document.getElementById("inpCamOcc").value;
+  var pfx=san(STRUCT.code).replace(/[^A-Z0-9]/g,"").slice(0,4);
+  while(pfx.length<4)pfx+="0";
+  function tipo(g,tot){if(tot===1)return"16";if(g.isLeader)return g.gtype==="famiglia"?"17":"18";return g.gtype==="famiglia"?"19":"20";}
+  return guests.map(function(g,i){
+    var tot=guests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
+    var ncC=getNC(g.cit),ncB=getNC(g.birthC||g.cit),ncR=getNC(g.residC||g.cit);
+    return pp(t,2)+pp(arr,10)+pp(san(g.lastName),50)+pp(san(g.firstName),30)+(g.gender==="F"?"2":"1")+pp(g.dob,10)+pp("",9)+pp(g.isItaly?"  ":"EE",2)+pp(ncB,9,true)+pp(ncC,9,true)+pp("",9)+pp("",2)+pp(ncR,9,true)+pp("",50)+(head?pp(DC[g.docType]||"",5):pp("",5))+(head?pp(san(g.docNumber||""),20):pp("",20))+pp("",9)+pp(dep,10)+pp("Non Specificato",30)+pp("Non Specificato",30)+(head?String(Number(camOcc)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.camDisp)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.lettiDisp)||2).padStart(4,"0"):pp("",4))+"0"+pp(pfx+String(i+1).padStart(6,"0"),10)+"1";
+  }).join("\r\n");
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function renderExport(){
+  var empty=document.getElementById("eksportEmpty");var filled=document.getElementById("eksportFilled");
+  if(!guests.length){empty.style.display="block";filled.style.display="none";return;}
+  empty.style.display="none";filled.style.display="block";
+  var arr=document.getElementById("inpArr").value;
+  var dep=addDays(arr,document.getElementById("inpNights").value);
+  var fname=STRUCT.code+"_"+arr.replace(/\//g,"")+".txt";
+  document.getElementById("expSummary").innerHTML='<span style="color:var(--text3)">Plik</span> <b style="color:var(--gold2)">'+fname+'</b><br/><span style="color:var(--text3)">Struttura</span> La Luna Bastremoli · L10046<br/><span style="color:var(--text3)">Arrivo</span> <b>'+arr+'</b> &nbsp; <span style="color:var(--text3)">Partenza</span> <b>'+dep+'</b><br/><span style="color:var(--text3)">Ospiti</span> <b style="color:var(--gold2)">'+guests.length+'</b>';
+  try{document.getElementById("expPreview").textContent=genTXT().split("\r\n")[0].slice(0,80)+"…";}catch(e){}
+  var leader=null;for(var i=0;i<guests.length;i++){if(guests[i].isLeader){leader=guests[i];break;}}
+  var hasErr=!arr||(leader&&(!leader.docType||!leader.docNumber));
+  for(var i=0;i<guests.length;i++){if(!guests[i].dob)hasErr=true;}
+  document.getElementById("btnGoExport").disabled=!!hasErr;
+}
+document.getElementById("btnDownload").addEventListener("click",function(){
+  if(!guests.length)return;
+  var arr=document.getElementById("inpArr").value;
+  var content=genTXT();var fname=STRUCT.code+"_"+arr.replace(/\//g,"")+".txt";var ok=false;
+  try{var blob=new Blob([content],{type:"text/plain;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=fname;a.style.display="none";document.body.appendChild(a);a.click();setTimeout(function(){try{document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}},500);ok=true;}catch(e){}
+  if(!ok){try{var a2=document.createElement("a");a2.href="data:text/plain;charset=utf-8,"+encodeURIComponent(content);a2.download=fname;document.body.appendChild(a2);a2.click();document.body.removeChild(a2);ok=true;}catch(e){}}
+  if(ok){document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="✓ Pobrano: "+fname;document.getElementById("dlFallback").style.display="none";}
+  else{document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="⚠ Skopiuj poniżej → zapisz jako "+fname;document.getElementById("dlFallback").style.display="block";document.getElementById("dlTxt").value=content;}
+});
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+document.getElementById("inpArr").value=todayStr();
+recalcDep();
+updateKeyStatus();
+</script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js')
+      .then(function(registration) {
+        console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
+      })
+      .catch(function(error) {
+        console.log('Błąd rejestracji Service Workera:', error);
+      });
+  });
+}
+</script>
+</body>
+</html>
+
