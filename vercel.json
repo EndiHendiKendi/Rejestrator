@@ -10,8 +10,14 @@
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
         { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/(.*\\.html)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]
     },
     {
@@ -20,5 +26,12 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/api/cron", "destination": "/api/cron.js" },
+    { "source": "/api/subscribe", "destination": "/api/subscribe.js" },
+    { "source": "/api/status", "destination": "/api/status.js" },
+    { "source": "/api/reservations", "destination": "/api/reservations.js" },
+    { "source": "/(.*)", "destination": "/$1" }
   ]
 }
