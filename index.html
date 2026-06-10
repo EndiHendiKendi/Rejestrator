@@ -1691,17 +1691,19 @@ document.getElementById("inpArr").value=todayStr();
 recalcDep();
 updateKeyStatus();
 </script>
-  <script>
+<script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js')
-      .then(function(registration) {
-        console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
-      })
-      .catch(function(error) {
-        console.log('Błąd rejestracji Service Workera:', error);
-      });
-  });
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    reg.onupdatefound = () => {
+      const installingWorker = reg.installing;
+      installingWorker.onstatechange = () => {
+        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // Jeśli jest nowa wersja - przeładuj stronę, żeby usunąć starą z cache
+          window.location.reload();
+        }
+      };
+    };
+  }).catch(err => console.log('Błąd SW:', err));
 }
 </script>
 </body>
