@@ -1680,12 +1680,12 @@ updateKeyStatus();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').then(reg => {
+  // Dodajemy ?v=2 na końcu, żeby zabić cache serwera Vercel raz na zawsze
+  navigator.serviceWorker.register('/sw.js?v=2').then(reg => {
     reg.onupdatefound = () => {
       const installingWorker = reg.installing;
       installingWorker.onstatechange = () => {
         if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // Jeśli jest nowa wersja - przeładuj stronę, żeby usunąć starą z cache
           window.location.reload();
         }
       };
