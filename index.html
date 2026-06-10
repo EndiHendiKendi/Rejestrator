@@ -276,6 +276,7 @@ select.inp{cursor:pointer;}
       <div class="topbar-title">Meldunek</div>
       <div class="topbar-sub">La Luna Bastremoli · L10046</div>
     </div>
+    <button onclick="icalPanelToggle()" title="Sync iCal" style="background:transparent;border:none;color:var(--gold2);font-size:22px;cursor:pointer;padding:4px 8px;">&#x1f504;</button>
     <div class="icon-btn" id="btnSettings">⚙️</div>
   </div>
 
@@ -449,15 +450,8 @@ select.inp{cursor:pointer;}
       <div class="topbar-title">Eksport</div>
       <div class="topbar-sub">Plik Ross1000 TXT v.4</div>
     </div>
-    <button onclick="icalPanelToggle()" title="iCal sync" style="background:transparent;border:1px solid rgba(201,169,110,.3);color:var(--gold2);border-radius:10px;padding:6px 10px;font-size:18px;cursor:pointer;">&#x1f504;</button>
   </div>
-  <div id="icalPanel" style="display:none;background:rgba(201,169,110,.07);border-bottom:1px solid rgba(201,169,110,.2);padding:12px 16px;">
-    <div style="font-size:12px;color:var(--gold2);font-weight:600;margin-bottom:8px;">&#x1f4c5; iCal — Airbnb / Booking</div>
-    <input type="url" id="icalUrlInput" class="inp" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;margin-bottom:8px;"/>
-    <div style="display:flex;gap:8px;"><button onclick="icalSync(); pushSubscribe()" class="btn btn-primary" style="font-size:13px;padding:10px;">Synchronizuj</button>
-<button onclick="icalPanelToggle()" class="btn btn-secondary" style="font-size:13px;padding:10px;width:auto;">Zamknij</button></div>
-    <div id="icalStatus" style="font-size:12px;margin-top:8px;color:var(--text3);"></div>
-  </div>
+
   <div id="eksportEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">💾</div>
     <div style="font-size:16px;font-weight:600;color:var(--text2);">Brak danych</div>
@@ -513,7 +507,7 @@ select.inp{cursor:pointer;}
   <div class="section-lbl">Nowy wpis</div>
   <div class="card">
     <div id="rz-groupList"><div style="color:var(--text3);font-size:13px;text-align:center;padding:4px 0;">Dodaj grupę lub wczytaj z meldunku</div></div>
-    <div style="margin-top:10px;display:flex;gap:8px;"><input type="text" id="rz-newName" class="inp" placeholder="Imię lidera" style="flex:2;font-size:14px;"/><input type="number" id="rz-newCount" class="inp" placeholder="os." min="1" style="flex:1;font-size:14px;"/><button id="btnRzAddGroup" class="btn btn-secondary" style="width:auto;padding:13px 14px;font-size:18px;flex-shrink:0;">+</button></div>
+    <div style="margin-top:10px;display:flex;gap:8px;"><input type="text" id="rz-newName" class="inp" placeholder="Imię lidera" style="flex:2;font-size:14px;"/><button id="btnRzAddGroup" class="btn btn-secondary" style="width:auto;padding:13px 14px;font-size:18px;flex-shrink:0;">+</button></div>
     <button id="btnRzLoad" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">🔄 Wczytaj z aktualnego meldunku</button>
   </div>
   <div class="card">
@@ -526,6 +520,28 @@ select.inp{cursor:pointer;}
   <div class="card"><div id="rz-extraList"></div><div style="display:flex;gap:8px;"><input type="text" id="rz-eName" class="inp" placeholder="Opis (np. Maurizio)" style="flex:2;font-size:14px;"/><input type="number" id="rz-eAmt" class="inp" placeholder="€" style="flex:1;font-size:14px;"/><select id="rz-eSign" class="inp" style="flex:1;font-size:14px;padding:13px 6px;"><option value="1">+</option><option value="-1">-</option></select></div><button id="btnRzAddExtra" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">+ Dodaj pozycję</button></div>
   <div style="display:flex;flex-direction:column;gap:10px;margin:8px 0 16px;"><button id="btnRzShare" class="btn btn-green">Udostępnij całą rozpiskę (WhatsApp)</button><button id="btnRzCopy" class="btn btn-secondary">Kopiuj całą rozpiskę</button></div>
   <div id="rz-copyOk" class="alert alert-ok" style="display:none;margin-bottom:16px;">✓ Skopiowano!</div>
+</div>
+
+<div class="screen" id="s-rezerwacje">
+  <div class="topbar">
+    <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub" id="rezYear">Sezon 2026</div></div>
+    <button onclick="rezSync()" style="background:transparent;border:1px solid rgba(201,169,110,.3);color:var(--gold2);border-radius:10px;padding:6px 10px;font-size:18px;cursor:pointer;">&#x1f504;</button>
+  </div>
+  <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
+    <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
+    <div style="font-size:15px;margin-bottom:8px;">Brak danych rezerwacji</div>
+    <div style="font-size:13px;">Skonfiguruj link iCal w Ustawieniach i zsynchronizuj</div>
+  </div>
+  <div id="rezTable" style="display:none;">
+    <div style="overflow-x:auto;margin-bottom:12px;">
+      <table id="rezTableEl" style="width:100%;border-collapse:collapse;font-size:13px;"></table>
+    </div>
+    <div style="padding:0 0 8px;display:flex;flex-direction:column;gap:10px;">
+      <button onclick="rezShareWhatsapp()" class="btn btn-green">&#x1f4e4; Wyślą do Margherity (WhatsApp)</button>
+      <button onclick="rezCopy()" class="btn btn-secondary">&#x1f4cb; Kopiuj tabelę</button>
+    </div>
+    <div id="rezCopyOk" class="alert alert-ok" style="display:none;margin-bottom:8px;">✓ Skopiowano!</div>
+  </div>
 </div>
 
 <nav class="nav">
@@ -547,7 +563,11 @@ select.inp{cursor:pointer;}
   </button>
   <button class="nav-btn" id="nb-rozliczenie">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-    Rozlicz
+    Margherita
+  </button>
+  <button class="nav-btn" id="nb-rezerwacje">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Rezerwacje
   </button>
 </nav>
 
@@ -570,14 +590,18 @@ select.inp{cursor:pointer;}
     <button id="btnSaveKey" class="btn btn-primary mb12">Zapisz klucz</button>
     <div id="keySaved" class="alert alert-ok" style="display:none;margin-bottom:12px;">✓ Klucz zapisany</div>
 
-    <div class="alert alert-warn" style="margin-bottom:16px;">
-      <div style="font-weight:600;margin-bottom:6px;">📲 Instalacja jako aplikacja</div>
-      <div style="font-size:13px;line-height:1.8;">
-        Wgraj plik na <b>GitHub Pages</b> (darmowe) i otwórz z adresu HTTPS.<br/>
-        Chrome → Menu ⋮ → <b>Dodaj do ekranu głównego</b> → <b>Zainstaluj</b>
-      </div>
-    </div>
+    
 
+    <div class="field-group" style="margin-bottom:12px;">
+      <label class="field-lbl">&#x1f504; Link iCal (Airbnb / Booking)</label>
+      <input type="url" id="icalUrlInput" class="inp" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;"/>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="icalSync()" class="btn btn-primary" style="font-size:13px;padding:10px;">Synchronizuj teraz</button>
+      </div>
+      <div id="icalStatus" style="font-size:12px;margin-top:8px;color:var(--text3);"></div>
+    </div>
+    <button id="btnEnablePush" onclick="pushSubscribe()" class="btn btn-secondary" style="margin-bottom:12px;">&#x1f514; Włącz powiadomienia push</button>
+    <div id="pushStatus" style="font-size:12px;color:var(--text3);margin-bottom:12px;"></div>
     <button id="btnCloseSettings" class="btn btn-secondary">Zamknij</button>
   </div>
 </div>
@@ -622,7 +646,7 @@ var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 // ═══════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════
-var SCREENS=["dane","skan","lista","eksport","rozliczenie"];
+var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje"];
 function showScreen(name){
   SCREENS.forEach(function(s){
     document.getElementById("s-"+s).classList.remove("active");
@@ -1353,10 +1377,10 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
   var lines=[],p="\u200B👤";
   groups.forEach(function(gr){
     lines.push(p+" *"+gr.name+"*");
-    if(cleaning)lines.push("- + "+(150*gr.count)+"\u20AC (sprz\u0105tanie)");
-    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12*gr.count);if(pa>0)lines.push("- +   "+pa+"\u20AC (basen)");}
+    if(cleaning)lines.push("- + 150\u20AC (sprz\u0105tanie)");
+    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);if(pa>0)lines.push("- +   "+pa+"\u20AC (basen)");}
     extras.forEach(function(ex){
-      var ea=Math.round(ex.amt*gr.count);
+      var ea=Math.round(ex.amt);
       lines.push(ex.sign>0?"- +   "+ea+"\u20AC ("+ex.desc+")":"- -   "+ea+"\u20AC ("+ex.desc+")");
     });
   });
@@ -1366,9 +1390,9 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
 function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
   var s=0;
   groups.forEach(function(gr){
-    if(cleaning)s+=150*gr.count;
-    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12*gr.count);s+=pa;}
-    extras.forEach(function(ex){var ea=Math.round(ex.amt*gr.count);s+=ex.sign>0?ea:-ea;});
+    if(cleaning)s+=150;
+    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);s+=pa;}
+    extras.forEach(function(ex){var ea=Math.round(ex.amt);s+=ex.sign>0?ea:-ea;});
   });
   return s;
 }
@@ -1523,6 +1547,143 @@ async function pushSubscribe(){
   }
 }
 
+
+
+// ================================================================
+// REZERWACJE MODULE
+// ================================================================
+var rezData = [];
+var MARGHERITA_PHONE = ''; // wypełnij numerem Margherity np. 48123456789
+
+var MONTHS_PL = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paz','lis','gru'];
+
+function fmtDate(iso) {
+  var d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0') + ' ' + MONTHS_PL[d.getMonth()];
+}
+
+function rezSync() {
+  var server = localStorage.getItem('push_server');
+  if (!server) { server = prompt('Adres serwera (np. https://laluna-notify.vercel.app):'); if(!server)return; localStorage.setItem('push_server',server); }
+  fetch(server + '/api/reservations')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.reservations) {
+        rezData = d.reservations;
+        localStorage.setItem('rez_cache', JSON.stringify(rezData));
+        rezRender();
+      }
+    })
+    .catch(function(e){ console.error('rezSync error:', e); });
+}
+
+function rezRender() {
+  // Load from cache if empty
+  if (!rezData.length) {
+    try { rezData = JSON.parse(localStorage.getItem('rez_cache') || '[]'); } catch(e){}
+  }
+  var empty = document.getElementById('rezEmpty');
+  var table = document.getElementById('rezTable');
+  if (!rezData.length) {
+    if(empty) empty.style.display='block';
+    if(table) table.style.display='none';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  if(table) table.style.display='block';
+
+  var el = document.getElementById('rezTableEl');
+  if (!el) return;
+
+  // Header
+  var html = '<thead><tr style="background:rgba(201,169,110,.15);">'
+    + '<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:12px;border-bottom:1px solid rgba(201,169,110,.2);">Zameldowanie</th>'
+    + '<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:12px;border-bottom:1px solid rgba(201,169,110,.2);">Wymeldowanie</th>'
+    + '<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:12px;border-bottom:1px solid rgba(201,169,110,.2);">Osoba</th>'
+    + '<th style="padding:10px 8px;text-align:center;color:var(--gold2);font-size:12px;border-bottom:1px solid rgba(201,169,110,.2);">Dor.</th>'
+    + '<th style="padding:10px 8px;text-align:center;color:var(--gold2);font-size:12px;border-bottom:1px solid rgba(201,169,110,.2);">Dz.</th>'
+    + '</tr></thead><tbody>';
+
+  rezData.forEach(function(ev, i) {
+    var bg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'transparent';
+    var name = (ev.summary || 'N/A').replace(/\s*[-–].*$/, '').trim(); // strip channel suffix
+    var adults = ev.adults || '?';
+    var children = ev.children || '0';
+    html += '<tr style="background:' + bg + ';" onclick="rezEditRow(' + i + ')">'
+      + '<td style="padding:10px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">' + fmtDate(ev.start) + '</td>'
+      + '<td style="padding:10px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">' + fmtDate(ev.end) + '</td>'
+      + '<td style="padding:10px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">' + name + '</td>'
+      + '<td style="padding:10px 8px;text-align:center;color:var(--blue);font-weight:700;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">' + adults + '</td>'
+      + '<td style="padding:10px 8px;text-align:center;color:var(--text3);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">' + children + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody>';
+  el.innerHTML = html;
+}
+
+function rezEditRow(i) {
+  var ev = rezData[i];
+  var name = (ev.summary || '').replace(/\s*[-–].*$/, '').trim();
+  var adults = prompt('Dorośli dla ' + name + ':', ev.adults || '');
+  if (adults === null) return;
+  var children = prompt('Dzieci:', ev.children || '0');
+  if (children === null) return;
+  rezData[i].adults = adults;
+  rezData[i].children = children;
+  localStorage.setItem('rez_cache', JSON.stringify(rezData));
+  rezRender();
+}
+
+function rezBuildText() {
+  var lines = ['*Rezerwacje La Luna di Bastremoli*', ''];
+  lines.push('Zameldowanie | Wymeldowanie | Osoba | Dor. | Dz.');
+  lines.push('─────────────────────────────────────────────');
+  rezData.forEach(function(ev) {
+    var name = (ev.summary || 'N/A').replace(/\s*[-–].*$/, '').trim();
+    lines.push(
+      fmtDate(ev.start) + ' | ' +
+      fmtDate(ev.end) + ' | ' +
+      name + ' | ' +
+      (ev.adults || '?') + ' | ' +
+      (ev.children || '0')
+    );
+  });
+  return lines.join('\n');
+}
+
+function rezShareWhatsapp() {
+  var txt = rezBuildText();
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
+
+function rezCopy() {
+  var txt = rezBuildText();
+  var ok = document.getElementById('rezCopyOk');
+  function showOk(){ if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},2500);} }
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(showOk);
+  else { var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showOk(); }
+}
+
+// Patch showScreen for rezerwacje
+var _rezOrig = showScreen;
+showScreen = function(n) {
+  _rezOrig(n);
+  if (n === 'rezerwacje') rezRender();
+};
+
+// Load cached on start
+(function(){
+  try { var c = localStorage.getItem('rez_cache'); if(c) rezData = JSON.parse(c); } catch(e){}
+})();
+
+// ================================================================
+// icalPanelToggle — teraz otwiera settings overlay
+// ================================================================
+function icalPanelToggle() {
+  var saved = localStorage.getItem('ical_url');
+  if (saved) { var inp = document.getElementById('icalUrlInput'); if(inp) inp.value = saved; }
+  openSettings();
+}
 
 // INIT
 // ═══════════════════════════════════════
