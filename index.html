@@ -1491,6 +1491,20 @@ function icalPanelToggle(){
   if(saved){var inp=document.getElementById("icalUrlInput");if(inp)inp.value=saved;}
   p.style.display=p.style.display==="none"?"block":"none";
 }
+async function icalSync(){
+  var url=(document.getElementById("icalUrlInput").value||"").trim();
+  if(!url){alert("Wklej link iCal");return;}
+  localStorage.setItem("ical_url",url);
+  var st=document.getElementById("icalStatus");
+  if(st){st.style.color="var(--gold2)";st.textContent="Synchronizuj\u0119...";}
+  var server=getServer();if(!server)return;
+  try{
+    var r=await fetch(server+"/api/ical-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({icalUrl:url})});
+    var d=await r.json();
+    if(st)st.style.color=d.ok?"#4ade80":"#ef4444";
+    if(st)st.textContent=d.ok?"\u2713 "+d.events+" rezerwacji, "+d.scheduled+" powiadomie\u0144":"B\u0142\u0105d: "+(d.error||"?");
+  }catch(e){if(st){st.style.color="#ef4444";st.textContent="B\u0142\u0105d: "+e.message;}}
+}
 async function pushSubscribe(){
   // Tworzymy widoczny pasek diagnostyczny na górze ekranu
   document.body.insertAdjacentHTML('beforeend', '<div id="debug-log" style="position:fixed;top:0;left:0;width:100%;background:white;color:black;z-index:99999;padding:15px;font-size:14px;border-bottom:3px solid red;font-family:sans-serif;">Uruchamianie push...</div>');
@@ -1510,10 +1524,9 @@ async function pushSubscribe(){
   if(!server) { log("X Serwer jest pusty"); return; }
   
   try{
-    log("-> Pobieranie aktywnego Service Workera...");
-    // Zamiast rejestrować na nowo, bierzemy instancję która pilnuje aktualizacji
-    var reg = await navigator.serviceWorker.ready;
-    log("-> Gotowy. Dekodowanie klucza...");
+    log("-> Rejestracja pliku sw.js...");
+    var reg=await navigator.serviceWorker.register('/sw.js');
+    log("-> Service Worker zarejestrowany. Dekodowanie klucza...");
     
     var base64 = VAPID_PUB.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
@@ -1678,19 +1691,17 @@ document.getElementById("inpArr").value=todayStr();
 recalcDep();
 updateKeyStatus();
 </script>
-<script>
+  <script>
 if ('serviceWorker' in navigator) {
-  // Dodajemy ?v=2 na końcu, żeby zabić cache serwera Vercel raz na zawsze
-  navigator.serviceWorker.register('/sw.js?v=2').then(reg => {
-    reg.onupdatefound = () => {
-      const installingWorker = reg.installing;
-      installingWorker.onstatechange = () => {
-        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          window.location.reload();
-        }
-      };
-    };
-  }).catch(err => console.log('Błąd SW:', err));
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js')
+      .then(function(registration) {
+        console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
+      })
+      .catch(function(error) {
+        console.log('Błąd rejestracji Service Workera:', error);
+      });
+  });
 }
 </script>
 </body>
