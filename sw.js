@@ -1,7 +1,51 @@
-// Service Worker — La Luna push notifications
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+// Service Worker — La Luna di Bastremoli
+// CACHE_VERSION: zmień przy każdym deploymencie aby wymusić odświeżenie
+const CACHE_VERSION = 'laluna-v7';
 
+self.addEventListener('install', e => {
+  // Natychmiastowa aktywacja — nie czeka na zamknięcie starych zakładek
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    // Usuń WSZYSTKIE stare cache przy aktywacji nowej wersji
+    caches.keys().then(keys =>
+      Promise.all(keys.map(key => {
+        if (key !== CACHE_VERSION) {
+          console.log('[SW] Usuwam stary cache:', key);
+          return caches.delete(key);
+        }
+      }))
+    ).then(() => clients.claim()) // Przejmij kontrolę nad wszystkimi zakładkami natychmiast
+  );
+});
+
+// Strategia: Network First — zawsze próbuj z sieci, fallback na cache
+self.addEventListener('fetch', e => {
+  // Nie cachuj requestów API ani zewnętrznych
+  if (e.request.url.includes('/api/') || !e.request.url.startsWith(self.location.origin)) {
+    return; // Przepuść bez cache
+  }
+  
+  e.respondWith(
+    fetch(e.request)
+      .then(response => {
+        // Zapisz świeżą wersję w cache
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_VERSION).then(cache => cache.put(e.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        // Sieć niedostępna — użyj cache
+        return caches.match(e.request);
+      })
+  );
+});
+
+// ── Push notifications ──
 const ICONS = {
   checkin:        '🏠',
   harmonogram_in: '💡',
@@ -12,28 +56,32 @@ const ICONS = {
 };
 
 self.addEventListener('push', e => {
-  let data = { title:'La Luna', body:'Nowe powiadomienie', type:'general' };
+  let data = { title: 'La Luna', body: 'Nowe powiadomienie', type: 'general' };
   try { if (e.data) data = e.data.json(); } catch(_) { if (e.data) data.body = e.data.text(); }
   const icon = ICONS[data.type] || '🔔';
-  e.waitUntil(self.registration.showNotification(`${icon} ${data.title}`, {
-    body: data.body,
-    tag: data.type,
-    renotify: true,
-    requireInteraction: true,
-    data: { url: '/' },
-    actions: [
-      { action:'open', title:'Otwórz' },
-      { action:'dismiss', title:'Zamknij' }
-    ]
-  }));
+  e.waitUntil(
+    self.registration.showNotification(`${icon} ${data.title}`, {
+      body: data.body,
+      tag: data.type,
+      renotify: true,
+      requireInteraction: true,
+      data: { url: '/' },
+      actions: [
+        { action: 'open', title: 'Otwórz' },
+        { action: 'dismiss', title: 'Zamknij' }
+      ]
+    })
+  );
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
   e.waitUntil(
-    clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
-      for (const c of list) if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+      }
       return clients.openWindow('/');
     })
   );
