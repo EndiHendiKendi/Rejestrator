@@ -1490,7 +1490,14 @@ async function pushSubscribe(){
   try{
     var reg=await navigator.serviceWorker.ready;
     function u2a(b){var s=b.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var r=atob(s);var a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a;}
-    var sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:u2a(VAPID_PUB)});
+    var base64 = VAPID_PUB.replace(/-/g, '+').replace(/_/g, '/');
+while (base64.length % 4) base64 += '=';
+var rawData = atob(base64);
+var outputArray = new Uint8Array(rawData.length);
+for (var i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+
+var sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
+
     var r=await fetch(server+"/api/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscription:sub.toJSON()})});
     var d=await r.json();
     if(d.ok){localStorage.setItem("push_active","1");alert("\u2713 Powiadomienia w\u0142\u0105czone!");}
