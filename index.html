@@ -600,7 +600,11 @@ select.inp{cursor:pointer;}
       </div>
       <div id="icalStatus" style="font-size:12px;margin-top:8px;color:var(--text3);"></div>
     </div>
-    <button id="btnEnablePush" onclick="pushSubscribe()" class="btn btn-secondary" style="margin-bottom:12px;">&#x1f514; Włącz powiadomienia push</button>
+    <div style="margin-bottom:12px;">
+      <label class="field-lbl">Adres serwera Vercel</label>
+      <input type="url" id="serverInput" class="inp" placeholder="https://twoje-repo.vercel.app" style="font-size:13px;" oninput="localStorage.setItem('push_server',this.value.trim().replace(/\/$/,''))"/>
+    </div>
+    <button id="btnEnablePush" onclick="pushSubscribe()" class="btn btn-secondary" style="margin-bottom:10px;">&#x1f514; Włącz powiadomienia push</button>
     <div id="pushStatus" style="font-size:12px;color:var(--text3);margin-bottom:12px;"></div>
     <button id="btnCloseSettings" class="btn btn-secondary">Zamknij</button>
   </div>
@@ -666,7 +670,12 @@ SCREENS.forEach(function(s){
 // ═══════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════
-function openSettings(){document.getElementById("inpApiKey").value=getApiKey();document.getElementById("overlaySettings").style.display="block";}
+function openSettings(){
+  var si = document.getElementById("serverInput");
+  if (si) si.value = localStorage.getItem("push_server") || "";
+  var ii = document.getElementById("icalUrlInput");
+  if (ii) ii.value = localStorage.getItem("ical_url") || "";
+document.getElementById("inpApiKey").value=getApiKey();document.getElementById("overlaySettings").style.display="block";}
 function closeSettings(){document.getElementById("overlaySettings").style.display="none";updateKeyStatus();}
 document.getElementById("btnSettings").addEventListener("click",openSettings);
 document.getElementById("btnCloseSettings").addEventListener("click",closeSettings);
@@ -1480,10 +1489,7 @@ rzRefreshHistory();
 var VAPID_PUB="BIdWnt6gT9XU6e9bB6Wp-7Z0f9Tbe4b6Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_wA";
 
 function getServer(){
-  var s=localStorage.getItem("push_server");
-  if(!s){s=prompt("Adres serwera (np. https://laluna-notify.vercel.app):");
-    if(s){s=s.replace(/\/$/,"");localStorage.setItem("push_server",s);}}
-  return s||"";
+  return localStorage.getItem("push_server")||"";
 }
 function icalPanelToggle(){
   var p=document.getElementById("icalPanel");if(!p)return;
@@ -1685,6 +1691,53 @@ function icalPanelToggle() {
   openSettings();
 }
 
+
+// ── First run setup ──
+function firstRunSave() {
+  var server = (document.getElementById('firstRunServer').value || '').trim().replace(/\/$/, '');
+  var ical   = (document.getElementById('firstRunIcal').value || '').trim();
+  if (!server) { alert('Wpisz adres serwera Vercel'); return; }
+  localStorage.setItem('push_server', server);
+  if (ical) {
+    localStorage.setItem('ical_url', ical);
+    var inp = document.getElementById('icalUrlInput');
+    if (inp) inp.value = ical;
+  }
+  document.getElementById('overlayFirstRun').style.display = 'none';
+  localStorage.setItem('first_run_done', '1');
+  // Od razu włącz powiadomienia push
+  pushSubscribe();
+}
+function firstRunSkip() {
+  document.getElementById('overlayFirstRun').style.display = 'none';
+  localStorage.setItem('first_run_done', '1');
+}
+// Pokaż overlay przy pierwszym uruchomieniu
+(function(){
+  if (!localStorage.getItem('first_run_done') && !localStorage.getItem('push_server')) {
+    // Poczekaj chwilę aż apka się załaduje
+    setTimeout(function(){
+      document.getElementById('overlayFirstRun').style.display = 'flex';
+    }, 1200);
+  }
+  // Przywróć zapisany iCal URL do inputa
+  var saved = localStorage.getItem('ical_url');
+  var inp = document.getElementById('icalUrlInput');
+  if (saved && inp) inp.value = saved;
+  // Pokaż status push
+  var ps = document.getElementById('pushStatus');
+  if (ps && localStorage.getItem('push_active') === '1') {
+    ps.textContent = '✓ Powiadomienia aktywne';
+    ps.style.color = '#4ade80';
+  }
+  // Pokaż adres serwera w settings
+  var srv = localStorage.getItem('push_server');
+  if (srv) {
+    var srvEl = document.getElementById('serverDisplay');
+    if (srvEl) srvEl.textContent = srv;
+  }
+})();
+
 // INIT
 // ═══════════════════════════════════════
 document.getElementById("inpArr").value=todayStr();
@@ -1704,6 +1757,29 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+<div id="overlayFirstRun" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:linear-gradient(135deg,#12120a,#1a1a0f);border:1px solid rgba(201,169,110,.3);border-radius:24px;padding:28px 24px;max-width:380px;width:100%;">
+    <div style="font-size:32px;text-align:center;margin-bottom:12px;">🏠</div>
+    <div style="font-size:20px;font-weight:700;text-align:center;color:var(--gold2);margin-bottom:6px;">La Luna di Bastremoli</div>
+    <div style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:24px;">Pierwsze uruchomienie — skonfiguruj powiadomienia</div>
+    
+    <div style="margin-bottom:16px;">
+      <label class="field-lbl">Adres serwera Vercel</label>
+      <input type="url" id="firstRunServer" class="inp" placeholder="https://twoje-repo.vercel.app" style="font-size:14px;"/>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">Skopiuj z dashboardu Vercel → twój projekt → adres URL</div>
+    </div>
+    
+    <div style="margin-bottom:20px;">
+      <label class="field-lbl">Link iCal (Airbnb / Booking) — opcjonalnie teraz</label>
+      <input type="url" id="firstRunIcal" class="inp" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;"/>
+    </div>
+    
+    <button onclick="firstRunSave()" class="btn btn-primary" style="margin-bottom:10px;">Zapisz i włącz powiadomienia</button>
+    <button onclick="firstRunSkip()" class="btn btn-secondary" style="font-size:13px;">Pomiń — skonfiguruj później w Ustawieniach</button>
+  </div>
+</div>
+
 </body>
 </html>
 
