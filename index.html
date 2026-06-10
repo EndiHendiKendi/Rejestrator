@@ -1488,7 +1488,7 @@ async function pushSubscribe(){
   if(perm!=="granted"){alert("Brak zgody na powiadomienia");return;}
   var server=getServer();if(!server)return;
   try{
-    var reg=await navigator.serviceWorker.ready;
+    var reg=await navigator.serviceWorker.register('/sw.js');
     function u2a(b){var s=b.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var r=atob(s);var a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a;}
     var base64 = VAPID_PUB.replace(/-/g, '+').replace(/_/g, '/');
 while (base64.length % 4) base64 += '=';
