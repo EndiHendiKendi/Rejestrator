@@ -95,6 +95,23 @@ export default async function handler(req, res) {
       }
     }
 
+
+    // Zeznanie podatkowe — 15 maja co roku
+    if (d.getMonth() === 4 && d.getDate() === 15) {
+      const taxKey = `tax_sent_${d.getFullYear()}`;
+      const taxSent = await kv.get(taxKey);
+      if (!taxSent && d.getHours() >= 9 && d.getHours() < 10) {
+        try {
+          await sendPush(sub, {
+            type: 'podatek',
+            title: '📋 Zeznanie podatkowe',
+            body: 'Zeznanie podatkowe - pliki CU'
+          });
+          await kv.set(taxKey, '1');
+          fired.push('podatek');
+        } catch(e) { console.error('Tax push failed:', e.message); }
+      }
+    }
     await kv.set('notif_schedule', JSON.stringify(remaining));
     return res.status(200).json({ ok: true, fired, remaining: remaining.length });
   } catch(e) {
