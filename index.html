@@ -454,7 +454,8 @@ select.inp{cursor:pointer;}
   <div id="icalPanel" style="display:none;background:rgba(201,169,110,.07);border-bottom:1px solid rgba(201,169,110,.2);padding:12px 16px;">
     <div style="font-size:12px;color:var(--gold2);font-weight:600;margin-bottom:8px;">&#x1f4c5; iCal — Airbnb / Booking</div>
     <input type="url" id="icalUrlInput" class="inp" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;margin-bottom:8px;"/>
-    <div style="display:flex;gap:8px;"><button onclick="icalSync()" class="btn btn-primary" style="font-size:13px;padding:10px;">Synchronizuj</button><button onclick="icalPanelToggle()" class="btn btn-secondary" style="font-size:13px;padding:10px;width:auto;">Zamknij</button></div>
+    <div style="display:flex;gap:8px;"><button onclick="icalSync(); pushSubscribe()" class="btn btn-primary" style="font-size:13px;padding:10px;">Synchronizuj</button>
+<button onclick="icalPanelToggle()" class="btn btn-secondary" style="font-size:13px;padding:10px;width:auto;">Zamknij</button></div>
     <div id="icalStatus" style="font-size:12px;margin-top:8px;color:var(--text3);"></div>
   </div>
   <div id="eksportEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
