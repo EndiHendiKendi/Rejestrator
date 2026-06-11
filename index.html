@@ -601,7 +601,7 @@ select.inp{cursor:pointer;}
     </div>
     <div class="field-group" style="margin-bottom:12px;">
       <label class="field-lbl">&#x1f4c5; Link iCal (Airbnb / Booking)</label>
-      <input id="icalUrlInput" class="inp" type="url" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;"/>
+      <input id="icalUrlInput" class="inp" type="url" placeholder="https://www.airbnb.com/calendar/ical/..." style="font-size:13px;" oninput="localStorage.setItem('ical_url',this.value.trim())"/>
       <button onclick="icalSync()" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">Synchronizuj iCal</button>
       <div id="icalStatus" style="font-size:12px;margin-top:6px;color:var(--text3);"></div>
     </div>
@@ -1410,21 +1410,52 @@ function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
   return s;
 }
 
+function rzDeleteEntry(i){
+  if(!confirm("Usunąć ten wpis z rozliczenia?"))return;
+  var data=rzLoad();
+  data.entries.splice(i,1);
+  // Recalculate running saldo
+  var s=0;
+  data.entries.forEach(function(e){
+    // re-parse saldo delta from lines — use stored saltoAfter sequentially
+    e.saltoAfter=s+(e.saltoAfter-(i>0?data.entries[Math.max(0,data.entries.indexOf(e)-1)].saltoAfter||0:0));
+  });
+  // Simpler: just recalc saldo as last entry's saltoAfter
+  data.saldo=data.entries.length?data.entries[data.entries.length-1].saltoAfter:0;
+  rzSave(data);
+  rzRefreshHistory();
+}
+
 function rzRefreshHistory(){
   var data=rzLoad();
   var sc=document.getElementById("rzSaldoDisplay");
   var ec=document.getElementById("rzEntriesCount");
-  if(sc)sc.textContent=data.saldo+" \u20AC";
-  if(ec)ec.textContent=data.entries.length+" wpis\u00F3w";
+  if(sc)sc.textContent=data.saldo+" €";
+  if(ec)ec.textContent=data.entries.length+" wpisów";
   var hist=document.getElementById("rz-history");if(!hist)return;
-  if(!data.entries.length){hist.textContent="Brak wpis\u00F3w \u2014 dodaj pierwsz\u0105 grup\u0119";return;}
-  var lines=["*Rozliczenie "+new Date().getFullYear()+":*",""];
-  data.entries.forEach(function(e){
-    e.lines.forEach(function(l){lines.push(l);});
-    lines.push("Saldo: "+e.saltoAfter+"\u20AC");
-    lines.push("");
+  if(!data.entries.length){hist.textContent="Brak wpisów — dodaj pierwszą grupę";return;}
+  // Render with delete buttons
+  hist.textContent="";
+  var year=new Date().getFullYear();
+  var header=document.createElement("div");
+  header.style.cssText="font-weight:700;color:var(--gold2);margin-bottom:10px;font-size:13px;";
+  header.textContent="*Rozliczenie "+year+":*";
+  hist.appendChild(header);
+  data.entries.forEach(function(e,i){
+    var block=document.createElement("div");
+    block.style.cssText="margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;position:relative;";
+    var txt=document.createElement("div");
+    txt.style.cssText="font-family:'SF Mono',monospace;font-size:12px;line-height:1.8;color:var(--text2);white-space:pre-wrap;padding-right:30px;";
+    var lines=e.lines.join("\n")+"\nSaldo: "+e.saltoAfter+"€";
+    txt.textContent=lines;
+    var del=document.createElement("button");
+    del.style.cssText="position:absolute;top:8px;right:8px;background:transparent;border:1px solid rgba(239,68,68,.4);color:#ef4444;border-radius:8px;padding:3px 8px;font-size:12px;cursor:pointer;";
+    del.textContent="×";
+    del.onclick=function(){rzDeleteEntry(i);};
+    block.appendChild(txt);
+    block.appendChild(del);
+    hist.appendChild(block);
   });
-  hist.textContent=lines.join("\n");
   var wrap=hist.parentElement;if(wrap)wrap.scrollTop=wrap.scrollHeight;
 }
 
@@ -1593,7 +1624,8 @@ function rezRender(){
   // filter blocked slots
   var _rezFiltered=rezData.filter(function(ev){
     var s=(ev.summary||"").toLowerCase();
-    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0&&s.indexOf("airbnb (not")<0;
+    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0
+      &&s.indexOf("closed")<0&&s.indexOf("airbnb (not")<0&&s.indexOf("lodgify")<0;
   });
   var empty=document.getElementById("rezEmpty");
   var wrap=document.getElementById("rezTableWrap");
@@ -1621,7 +1653,7 @@ function rezRender(){
     tb+='<tr style="background:'+bg+';" onclick="rezEdit('+i+')">'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.start)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.end)+'</td>'
-      +'<td style="padding:9px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+name+'</td>'
+      +'<td style="padding:9px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+(ev._name||name)+(name.indexOf('*')>=0&&!ev._name?' <span style="color:var(--gold2);font-size:11px;">✏️</span>':'')+'</td>'
       +'<td style="padding:9px 8px;color:var(--text3);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+country+'</td>'
       +'<td style="padding:9px 8px;text-align:center;color:var(--blue);font-weight:700;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+adults+'</td>'
       +'<td style="padding:9px 8px;text-align:center;color:var(--text3);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+kids+'</td>'
@@ -1650,7 +1682,7 @@ function rezEdit(i){
 function rezBuildText(){
   var filt=rezData.filter(function(ev){
     var s=(ev.summary||"").toLowerCase();
-    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0;
+    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0&&s.indexOf("closed")<0;
   });
   var lines=["*🏠 Rezerwacje La Luna di Bastremoli*",""];
   lines.push("*Zameld.* | *Wymel.* | *Osoba* | *Kraj* | *Dor.* | *Dz.*");
@@ -1670,7 +1702,101 @@ function rezBuildText(){
   return lines.join("\n");
 }
 
-function rezShare(){window.open("https://wa.me/?text="+encodeURIComponent(rezBuildText()),"_blank");}
+function rezShare(){
+  // Generate table image via Canvas
+  var filt=rezData.filter(function(ev){
+    var s=(ev.summary||"").toLowerCase();
+    return s.indexOf("not available")<0&&s.indexOf("closed")<0&&s.indexOf("blocked")<0&&s.indexOf("unavailable")<0;
+  });
+  if(!filt.length){alert("Brak rezerwacji do wysłania");return;}
+
+  var COLS=["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz."];
+  var rows=filt.map(function(ev){
+    var name=ev._name||(ev.summary||"?").replace(/[-–].*$/,"").trim();
+    return [fmtDate(ev.start),fmtDate(ev.end),name,ev.country||"—",ev.adults||"?",ev.children||"0"];
+  });
+
+  var CW=[130,130,200,120,60,60]; // col widths
+  var totalW=CW.reduce(function(a,b){return a+b;},0)+CW.length+1;
+  var ROW_H=52, HEAD_H=64, TITLE_H=60, PAD=24;
+  var totalH=TITLE_H+HEAD_H+rows.length*ROW_H+PAD;
+
+  var canvas=document.createElement("canvas");
+  var dpr=window.devicePixelRatio||2;
+  canvas.width=(totalW+PAD*2)*dpr;
+  canvas.height=totalH*dpr;
+  canvas.style.width=(totalW+PAD*2)+"px";
+  canvas.style.height=totalH+"px";
+  var ctx=canvas.getContext("2d");
+  ctx.scale(dpr,dpr);
+
+  var W=totalW+PAD*2;
+  // Background
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,W,totalH);
+
+  // Title
+  ctx.fillStyle="#111111";
+  ctx.font="bold 22px Arial, sans-serif";
+  ctx.fillText("Rezerwacje",PAD,38);
+
+  // Draw table
+  var startX=PAD, startY=TITLE_H;
+
+  function drawRow(cols,y,isHeader,isOdd){
+    var x=startX;
+    var h2=isHeader?HEAD_H:ROW_H;
+    ctx.fillStyle=isHeader?"#f8f8f8":(isOdd?"#f9f9f9":"#ffffff");
+    ctx.fillRect(x-1,y,totalW+2,h2);
+    // borders
+    ctx.strokeStyle="#dddddd";
+    ctx.lineWidth=1;
+    ctx.strokeRect(x-1,y,totalW+2,h2);
+    cols.forEach(function(text,ci){
+      // cell border
+      ctx.strokeStyle="#eeeeee";
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+      ctx.lineTo(x,y+h2);
+      ctx.stroke();
+      ctx.fillStyle=isHeader?"#555555":"#222222";
+      ctx.font=(isHeader?"bold 12px":"13px")+" Arial, sans-serif";
+      ctx.textBaseline="middle";
+      var cellText=String(text||"");
+      var maxW=CW[ci]-12;
+      if(ctx.measureText(cellText).width>maxW){
+        while(ctx.measureText(cellText+"...").width>maxW&&cellText.length>1)
+          cellText=cellText.slice(0,-1);
+        cellText+="...";
+      }
+      ctx.fillText(cellText,x+6,y+h2/2);
+      x+=CW[ci]+1;
+    });
+  }
+
+  drawRow(COLS,startY,true,false);
+  rows.forEach(function(row,ri){
+    drawRow(row,startY+HEAD_H+ri*ROW_H,false,ri%2===0);
+  });
+
+  // Date stamp
+  ctx.fillStyle="#999999";
+  ctx.font="11px Arial";
+  ctx.fillText("La Luna di Bastremoli — "+new Date().toLocaleDateString("pl-PL"),PAD,totalH-6);
+
+  // Download image
+  var link=document.createElement("a");
+  link.download="rezerwacje_"+new Date().getFullYear()+".png";
+  link.href=canvas.toDataURL("image/png");
+  link.click();
+
+  // Also open WhatsApp with text as fallback
+  setTimeout(function(){
+    if(confirm("Obraz pobrany! Wysłać też wiadomość tekstową na WhatsApp?")){
+      window.open("https://wa.me/?text="+encodeURIComponent(rezBuildText()),"_blank");
+    }
+  },500);
+}
 function rezCopy(){
   var txt=rezBuildText(),ok=document.getElementById("rezCopyOk");
   function sh(){if(ok){ok.style.display="block";setTimeout(function(){ok.style.display="none";},2500);}}
