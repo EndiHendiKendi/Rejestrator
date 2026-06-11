@@ -271,13 +271,12 @@ select.inp{cursor:pointer;}
 <body>
 
 <div class="screen active" id="s-dane">
-  <div class="topbar">
-    <div>
-      <div class="topbar-title" style="font-size:15px;letter-spacing:-.2px;">La Luna di Bastremoli</div>
-      <div class="topbar-sub">La Luna Bastremoli · L10046</div>
+  <div class="topbar" style="padding:6px 14px;">
+    <img src="logo.png" alt="La Luna di Bastremoli" style="height:40px;width:auto;object-fit:contain;max-width:200px;"/>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button id="btnIcalRefresh" onclick="doIcalSync()" title="Odśwież iCal" style="background:transparent;border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:17px;cursor:pointer;padding:5px 8px;border-radius:10px;line-height:1;">&#x1f504;</button>
+      <div class="icon-btn" id="btnSettings">⚙️</div>
     </div>
-    <button onclick="icalPanelToggle()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;line-height:1;">&#x1f504;</button>
-    <div class="icon-btn" id="btnSettings">⚙️</div>
   </div>
 
   <div class="card-gold">
@@ -514,11 +513,13 @@ select.inp{cursor:pointer;}
   <div class="section-lbl">Nowy wpis</div>
   <div class="card">
     <div id="rz-groupList"><div style="color:var(--text3);font-size:13px;text-align:center;padding:4px 0;">Dodaj grupę lub wczytaj z meldunku</div></div>
-    <div style="margin-top:10px;display:flex;gap:8px;"><input type="text" id="rz-newName" class="inp" placeholder="Imię lidera" style="flex:2;font-size:14px;"/><input type="number" id="rz-newCount" class="inp" placeholder="os." min="1" style="flex:1;font-size:14px;"/><button id="btnRzAddGroup" class="btn btn-secondary" style="width:auto;padding:13px 14px;font-size:18px;flex-shrink:0;">+</button></div>
+    <div style="margin-top:10px;display:flex;gap:8px;"><input type="text" id="rz-newName" class="inp" placeholder="Imię lidera" style="flex:2;font-size:14px;"/><button id="btnRzAddGroup" class="btn btn-secondary" style="width:auto;padding:13px 14px;font-size:18px;flex-shrink:0;">+</button></div>
     <button id="btnRzLoad" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">🔄 Wczytaj z aktualnego meldunku</button>
+    <button id="btnRzHistory" class="btn btn-secondary" style="margin-top:6px;font-size:13px;">📜 Z historii gości</button>
+    <div id="rz-histPicker" style="display:none;margin-top:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;max-height:180px;overflow-y:auto;padding:4px 0;"></div>
   </div>
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div><div style="font-size:14px;font-weight:600;">Sprzątanie</div><div style="font-size:12px;color:var(--text3);">150€ × liczba osób</div></div><label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;"><input type="checkbox" id="rz-cleaning" checked style="opacity:0;width:0;height:0;"><span id="rz-cleaningTog" style="position:absolute;cursor:pointer;inset:0;background:#c9a96e;border-radius:13px;transition:.3s;"></span></label></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div><div style="font-size:14px;font-weight:600;">Sprzątanie</div><div style="font-size:12px;color:var(--text3);">150€ za rezerwację</div></div><label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;"><input type="checkbox" id="rz-cleaning" checked style="opacity:0;width:0;height:0;"><span id="rz-cleaningTog" style="position:absolute;cursor:pointer;inset:0;background:#c9a96e;border-radius:13px;transition:.3s;"></span></label></div>
     <label class="field-lbl">Basen — godziny (12€/h) + edytowalna kwota</label>
     <div style="display:flex;gap:8px;align-items:center;"><input type="number" id="rz-poolH" class="inp" placeholder="0h" min="0" step="0.5" style="flex:1;font-size:18px;font-weight:700;color:var(--blue);"/><span style="color:var(--text3);">=</span><div style="position:relative;flex:1;"><input type="number" id="rz-poolC" class="inp" placeholder="auto" min="0" style="font-size:18px;font-weight:700;color:var(--gold2);padding-right:22px;" data-m="0"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">€</span></div></div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px;">Godziny wyliczają auto — prawa kwota edytowalna ręcznie</div>
@@ -544,7 +545,7 @@ select.inp{cursor:pointer;}
       <table id="rezTableEl" style="width:100%;border-collapse:collapse;font-size:13px;min-width:320px;"></table>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
-      <button onclick="rezShare()" class="btn btn-green">&#x1f4e4; Wyślą do Margherity (WhatsApp)</button>
+      <button onclick="rezShare()" class="btn btn-green">Wyślij przez WhatsApp</button>
       <button onclick="rezCopy()" class="btn btn-secondary">&#x1f4cb; Kopiuj tabelę</button>
     </div>
     <div id="rezCopyOk" class="alert alert-ok" style="display:none;margin-top:8px;">✓ Skopiowano!</div>
@@ -1345,10 +1346,9 @@ function rzRenderGroups(){
 
 document.getElementById("btnRzAddGroup").addEventListener("click",function(){
   var n=(document.getElementById("rz-newName").value||"").trim();
-  var cnt=parseInt(document.getElementById("rz-newCount").value)||1;
   if(!n){alert("Wpisz imi\u0119 lidera");return;}
-  rzGroups.push({name:n,count:cnt});
-  document.getElementById("rz-newName").value="";document.getElementById("rz-newCount").value="";
+  rzGroups.push({name:n,count:1});
+  document.getElementById("rz-newName").value="";
   rzRenderGroups();
 });
 
@@ -1390,10 +1390,10 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
   var lines=[],p="\u200B👤";
   groups.forEach(function(gr){
     lines.push(p+" *"+gr.name+"*");
-    if(cleaning)lines.push("- + "+(150*gr.count)+"\u20AC (sprz\u0105tanie)");
-    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12*gr.count);if(pa>0)lines.push("- +   "+pa+"\u20AC (basen)");}
+    if(cleaning)lines.push("- + "+150+"\u20AC (sprz\u0105tanie)");
+    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);if(pa>0)lines.push("- +   "+pa+"\u20AC (basen)");}
     extras.forEach(function(ex){
-      var ea=Math.round(ex.amt*gr.count);
+      var ea=Math.round(ex.amt);
       lines.push(ex.sign>0?"- +   "+ea+"\u20AC ("+ex.desc+")":"- -   "+ea+"\u20AC ("+ex.desc+")");
     });
   });
@@ -1403,9 +1403,9 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
 function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
   var s=0;
   groups.forEach(function(gr){
-    if(cleaning)s+=150*gr.count;
-    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12*gr.count);s+=pa;}
-    extras.forEach(function(ex){var ea=Math.round(ex.amt*gr.count);s+=ex.sign>0?ea:-ea;});
+    if(cleaning)s+=150;
+    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);s+=pa;}
+    extras.forEach(function(ex){var ea=Math.round(ex.amt);s+=ex.sign>0?ea:-ea;});
   });
   return s;
 }
@@ -1440,6 +1440,11 @@ function rzCommit(){
   data.saldo+=delta;
   data.entries.push({lines:lines,saltoAfter:data.saldo,ts:Date.now()});
   rzSave(data);
+  // Save to guest history
+  var _hist=JSON.parse(localStorage.getItem("guest_history")||"[]");
+  rzGroups.forEach(function(g){if(g.name&&_hist.indexOf(g.name)<0)_hist.unshift(g.name);});
+  if(_hist.length>60)_hist=_hist.slice(0,60);
+  localStorage.setItem("guest_history",JSON.stringify(_hist));
   rzGroups=[];rzExtras=[];
   document.getElementById("rz-poolH").value="";
   document.getElementById("rz-poolC").value="";pcEl.dataset.m="0";
@@ -1493,8 +1498,21 @@ rzRefreshHistory();
 var VAPID_PUB="BIdWnt6gT9XU6e9bB6Wp-7Z0f9Tbe4b6Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_wA";
 
 function getServer(){return localStorage.getItem("push_server")||"";}
-function icalPanelToggle(){
-  openSettings();
+function icalPanelToggle(){openSettings();}
+async function doIcalSync(){
+  var url=localStorage.getItem("ical_url")||"";
+  if(!url){openSettings();return;}
+  var btn=document.getElementById("btnIcalRefresh");
+  if(btn){btn.textContent="⏳";btn.style.opacity="0.6";}
+  var server=getServer();
+  if(!server){if(btn){btn.textContent="&#x1f504;";btn.style.opacity="1";}openSettings();return;}
+  try{
+    var r=await fetch(server+"/api/ical-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({icalUrl:url})});
+    var d=await r.json();
+    if(btn){btn.textContent=d.ok?"✓":"!";btn.style.opacity="1";setTimeout(function(){btn.innerHTML="&#x1f504;";btn.style.opacity="1";},2000);}
+  }catch(e){
+    if(btn){btn.innerHTML="&#x1f504;";btn.style.opacity="1";}
+  }
 }
 async function icalSync(){
   var url=(document.getElementById("icalUrlInput")||{}).value||"";
@@ -1572,15 +1590,21 @@ function rezRender(){
   if(!rezData.length){
     try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
   }
+  // filter blocked slots
+  var _rezFiltered=rezData.filter(function(ev){
+    var s=(ev.summary||"").toLowerCase();
+    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0&&s.indexOf("airbnb (not")<0;
+  });
   var empty=document.getElementById("rezEmpty");
   var wrap=document.getElementById("rezTableWrap");
-  if(!rezData.length){
+  if(!_rezFiltered.length){
     if(empty)empty.style.display="block";
     if(wrap)wrap.style.display="none";
     return;
   }
   if(empty)empty.style.display="none";
   if(wrap)wrap.style.display="block";
+  if(!_rezFiltered.length){if(empty)empty.style.display="block";if(wrap)wrap.style.display="none";return;}
   var el=document.getElementById("rezTableEl");if(!el)return;
   var th="<thead><tr style=\"background:rgba(201,169,110,.12);\">";
   ["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz."].forEach(function(col){
@@ -1588,7 +1612,7 @@ function rezRender(){
   });
   th+="</tr></thead>";
   var tb="<tbody>";
-  rezData.forEach(function(ev,i){
+  _rezFiltered.forEach(function(ev,i){
     var bg=i%2===0?"rgba(255,255,255,.02)":"transparent";
     var name=(ev.summary||"N/A").replace(/\s*[-–].*$/,"").trim();
     var adults=ev.adults||"?";
@@ -1624,11 +1648,25 @@ function rezEdit(i){
 }
 
 function rezBuildText(){
-  var lines=["*Rezerwacje La Luna di Bastremoli*",""];
-  rezData.forEach(function(ev){
-    var name=(ev.summary||"N/A").replace(/\s*[-–].*$/,"").trim();
-    lines.push(fmtDate(ev.start)+" → "+fmtDate(ev.end)+" | "+name+" | "+(ev.country||"")+" | Dor: "+(ev.adults||"?")+", Dz: "+(ev.children||"0"));
+  var filt=rezData.filter(function(ev){
+    var s=(ev.summary||"").toLowerCase();
+    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0;
   });
+  var lines=["*🏠 Rezerwacje La Luna di Bastremoli*",""];
+  lines.push("*Zameld.* | *Wymel.* | *Osoba* | *Kraj* | *Dor.* | *Dz.*");
+  lines.push("────────────────────────────────────────");
+  filt.forEach(function(ev){
+    var name=(ev.summary||"?").replace(/[\s\S]*Airbnb.*$/i,"").replace(/[-–].*$/,"").trim();
+    lines.push(
+      fmtDate(ev.start)+" | "+fmtDate(ev.end)
+      +" | "+name
+      +" | "+(ev.country||"—")
+      +" | "+(ev.adults||"?")
+      +" | "+(ev.children||"0")
+    );
+  });
+  lines.push("");
+  lines.push("_"+new Date().toLocaleDateString("pl-PL")+"_");
   return lines.join("\n");
 }
 
@@ -1677,6 +1715,24 @@ function frSkip(){
   var ps=document.getElementById("pushStatus");
   if(ps&&localStorage.getItem("push_active")==="1"){ps.textContent="✓ Powiadomienia aktywne";ps.style.color="#4ade80";}
 })();
+
+
+// ── Guest history picker ──
+document.getElementById("btnRzHistory").addEventListener("click",function(){
+  var pk=document.getElementById("rz-histPicker");
+  if(pk.style.display!=="none"){pk.style.display="none";return;}
+  var hist=JSON.parse(localStorage.getItem("guest_history")||"[]");
+  if(!hist.length){alert("Brak historii — dodaj kilka rozliczeń najpierw");return;}
+  pk.innerHTML="";
+  hist.forEach(function(name){
+    var b=document.createElement("button");
+    b.style.cssText="width:100%;text-align:left;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text);font-size:14px;cursor:pointer;";
+    b.textContent=name;
+    b.onclick=function(){rzGroups.push({name:name,count:1});pk.style.display="none";rzRenderGroups();};
+    pk.appendChild(b);
+  });
+  pk.style.display="block";
+});
 
 // INIT
 // ═══════════════════════════════════════
