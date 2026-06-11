@@ -1413,14 +1413,15 @@ function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
 function rzDeleteEntry(i){
   if(!confirm("Usunąć ten wpis z rozliczenia?"))return;
   var data=rzLoad();
+  // Calculate delta that this entry contributed
+  var prevSaldo=i>0?data.entries[i-1].saltoAfter:0;
+  var delta=data.entries[i].saltoAfter-prevSaldo;
+  // Remove the entry
   data.entries.splice(i,1);
-  // Recalculate running saldo
-  var s=0;
-  data.entries.forEach(function(e){
-    // re-parse saldo delta from lines — use stored saltoAfter sequentially
-    e.saltoAfter=s+(e.saltoAfter-(i>0?data.entries[Math.max(0,data.entries.indexOf(e)-1)].saltoAfter||0:0));
-  });
-  // Simpler: just recalc saldo as last entry's saltoAfter
+  // Subtract delta from all subsequent entries
+  for(var j=i;j<data.entries.length;j++){
+    data.entries[j].saltoAfter-=delta;
+  }
   data.saldo=data.entries.length?data.entries[data.entries.length-1].saltoAfter:0;
   rzSave(data);
   rzRefreshHistory();
@@ -1546,9 +1547,10 @@ async function doIcalSync(){
   }
 }
 async function icalSync(){
-  var url=(document.getElementById("icalUrlInput")||{}).value||"";
-  url=url.trim();
-  if(!url){alert("Wklej link iCal");return;}
+  var inp=document.getElementById("icalUrlInput");
+  var url=(inp?inp.value:"").trim()||localStorage.getItem("ical_url")||"";
+  if(inp&&!inp.value&&url)inp.value=url;
+  if(!url){alert("Wklej link iCal w ustawieniach");return;}
   localStorage.setItem("ical_url",url);
   var st=document.getElementById("icalStatus");
   if(st){st.style.color="var(--gold2)";st.textContent="Synchronizuję...";}
@@ -1790,12 +1792,10 @@ function rezShare(){
   link.href=canvas.toDataURL("image/png");
   link.click();
 
-  // Also open WhatsApp with text as fallback
+  // Auto-open WhatsApp with text after image download
   setTimeout(function(){
-    if(confirm("Obraz pobrany! Wysłać też wiadomość tekstową na WhatsApp?")){
-      window.open("https://wa.me/?text="+encodeURIComponent(rezBuildText()),"_blank");
-    }
-  },500);
+    window.open("https://wa.me/?text="+encodeURIComponent(rezBuildText()),"_blank");
+  },800);
 }
 function rezCopy(){
   var txt=rezBuildText(),ok=document.getElementById("rezCopyOk");
