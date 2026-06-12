@@ -89,6 +89,24 @@ export default async function handler(req, res) {
       }
     }
 
+    
+    // IMU — 1 czerwca (rata 1)
+    if (d.getMonth()===5 && d.getDate()===1 && d.getHours()>=9 && d.getHours()<10) {
+      const imu1k = `imu1_${d.getFullYear()}`;
+      if (!await kv.get(imu1k)) {
+        await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'}).catch(()=>{});
+        await kv.set(imu1k,'1'); fired.push('imu1');
+      }
+    }
+    // IMU — 1 grudnia (rata 2)
+    if (d.getMonth()===11 && d.getDate()===1 && d.getHours()>=9 && d.getHours()<10) {
+      const imu2k = `imu2_${d.getFullYear()}`;
+      if (!await kv.get(imu2k)) {
+        await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'}).catch(()=>{});
+        await kv.set(imu2k,'1'); fired.push('imu2');
+      }
+    }
+    
     return res.status(200).json({ ok:true, fired, remaining:remaining.length });
   } catch(e) {
     console.error('cron error:', e);
