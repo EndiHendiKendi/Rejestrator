@@ -2278,7 +2278,7 @@ function pinDel() {
 async function _pinCheck() {
   var entered = await _pinHash(_pin);
   if (entered === PIN_HASH) {
-    localStorage.setItem("pin_auth","1");
+    localStorage.setItem("pin_auth","1");localStorage.setItem("pin_ver",PIN_VERSION||"v2");
     var lock = document.getElementById("pinLock");
     if (lock) { lock.style.opacity="0"; lock.style.transition="opacity .4s"; setTimeout(function(){lock.style.display="none";},400); }
   } else {
@@ -2297,12 +2297,16 @@ async function _pinCheck() {
   }
 }
 
-// Pokaż PIN jeśli nie zalogowany
+// Chowaj PIN tylko jeśli już zalogowany na tym urządzeniu
+var PIN_VERSION = "v2"; // zmień żeby wymusić ponowne logowanie
 (function() {
-  if (localStorage.getItem("pin_auth") !== "1") {
-    var lock = document.getElementById("pinLock");
-    if (lock) lock.style.display = "flex";
+  var auth = localStorage.getItem("pin_auth");
+  var ver  = localStorage.getItem("pin_ver");
+  var lock = document.getElementById("pinLock");
+  if (auth === "1" && ver === PIN_VERSION) {
+    if (lock) lock.style.display = "none";
   }
+  // else: zostaje display:flex — PIN widoczny
 })();
 
 // INIT
@@ -2361,7 +2365,7 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-<div id="pinLock" style="display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
+<div id="pinLock" style="display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
   <div style="text-align:center;margin-bottom:44px;">
     <img src="logo.png" alt="La Luna" style="height:72px;width:auto;object-fit:contain;margin-bottom:18px;display:block;margin-left:auto;margin-right:auto;"/>
     <div style="font-size:11px;color:rgba(201,169,110,.45);letter-spacing:2px;text-transform:uppercase;">Wprowadź PIN</div>
