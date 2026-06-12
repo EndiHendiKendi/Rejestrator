@@ -687,6 +687,15 @@ z kodem QR lub kodem kreskowym</div>
       <div id="icalStatus" style="font-size:12px;margin-top:6px;color:var(--text3);"></div>
     </div>
     <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
+    <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
+    <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Synchronizacja danych</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Rozliczenia, karty, historia — synchronizowane między urządzeniami przez serwer Vercel.</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button onclick="kvPush()" class="btn btn-secondary" style="flex:1;font-size:13px;">↑ Wyślij dane</button>
+      <button onclick="kvPull()" class="btn btn-secondary" style="flex:1;font-size:13px;">↓ Pobierz dane</button>
+    </div>
+    <div id="kvSyncStatus" style="font-size:12px;color:var(--text3);margin-bottom:16px;min-height:16px;"></div>
+    <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
     <button onclick="pushSubscribe()" class="btn btn-secondary" style="margin-bottom:8px;">&#x1f514; Włącz powiadomienia push</button>
     <div id="pushStatus" style="font-size:12px;color:var(--text3);margin-bottom:16px;"></div>
 
@@ -2151,6 +2160,80 @@ showScreen=function(n){_kartyShow(n);if(n==="karty")kartyRender();};
     else{var ov=document.getElementById("overlayKarta");if(ov)ov.style.display="none";}
   };
 })();
+
+// ================================================================
+// SYNCHRONIZACJA DANYCH — Vercel KV
+// ================================================================
+var KV_SYNC_KEY = 'kv_last_sync';
+
+async function kvPush() {
+  var server = getServer();
+  if (!server) return;
+  var payload = {
+    rz_data:    localStorage.getItem('rz_' + new Date().getFullYear()),
+    rz_year:    localStorage.getItem('rz_year'),
+    guest_hist: localStorage.getItem('guest_history'),
+    karty:      localStorage.getItem('loyalty_cards'),
+    ical_url:   localStorage.getItem('ical_url'),
+    rez_cache:  localStorage.getItem('rez_cache'),
+    vac_mode:   localStorage.getItem('vac_mode'),
+    push_server:localStorage.getItem('push_server'),
+  };
+  try {
+    await fetch(server + '/api/kv-sync', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'push', data: payload})
+    });
+    localStorage.setItem(KV_SYNC_KEY, Date.now());
+  } catch(e) { console.log('kvPush error:', e.message); }
+}
+
+async function kvPull() {
+  var server = getServer();
+  if (!server) return;
+  try {
+    var r = await fetch(server + '/api/kv-sync?action=pull');
+    var d = await r.json();
+    if (!d.data) return;
+    var dd = d.data;
+    if (dd.rz_data)    localStorage.setItem('rz_' + new Date().getFullYear(), dd.rz_data);
+    if (dd.rz_year)    localStorage.setItem('rz_year', dd.rz_year);
+    if (dd.guest_hist) localStorage.setItem('guest_history', dd.guest_hist);
+    if (dd.karty)      localStorage.setItem('loyalty_cards', dd.karty);
+    if (dd.ical_url)   localStorage.setItem('ical_url', dd.ical_url);
+    if (dd.rez_cache)  localStorage.setItem('rez_cache', dd.rez_cache);
+    if (dd.vac_mode)   localStorage.setItem('vac_mode', dd.vac_mode);
+    localStorage.setItem(KV_SYNC_KEY, Date.now());
+    // Refresh UI
+    rzRefreshHistory();
+    kartyRender();
+    rezRender();
+    var syncEl = document.getElementById('kvSyncStatus');
+    if (syncEl) { syncEl.textContent = '\u2713 Zsynchronizowano ' + new Date().toLocaleTimeString('pl-PL'); syncEl.style.color='#4ade80'; }
+  } catch(e) {
+    var syncEl = document.getElementById('kvSyncStatus');
+    if (syncEl) { syncEl.textContent = 'B\u0142\u0105d sync: ' + e.message; syncEl.style.color='#ef4444'; }
+    console.log('kvPull error:', e.message);
+  }
+}
+
+// Auto-push po każdej zmianie w rozliczeniu
+var _origRzSave = rzSave;
+rzSave = function(d) { _origRzSave(d); setTimeout(kvPush, 500); };
+
+// Auto-push po każdej zmianie w kartach
+var _origKartySaveAll = kartySaveAll;
+kartySaveAll = function(arr) { _origKartySaveAll(arr); setTimeout(kvPush, 500); };
+
+// Pull przy starcie apki (jeśli dawno nie synchronizowano)
+(function(){
+  var last = parseInt(localStorage.getItem(KV_SYNC_KEY)||'0');
+  if (Date.now() - last > 3600000) { // pull jeśli >1h od ostatniej sync
+    setTimeout(kvPull, 2000);
+  }
+})();
+
 // INIT
 // ═══════════════════════════════════════
 document.getElementById("inpArr").value=todayStr();
