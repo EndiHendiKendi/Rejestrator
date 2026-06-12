@@ -579,7 +579,7 @@ z kodem QR lub kodem kreskowym</div>
     <div id="kartaDetailSub" style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:24px;"></div>
     <!-- Code image -->
     <div style="background:#ffffff;border-radius:20px;padding:24px;text-align:center;margin-bottom:20px;">
-      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;"/>
+      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;touch-action:pinch-zoom;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;" oncontextmenu="return false;" draggable="false"/>
     </div>
     <div style="display:flex;gap:10px;">
       <button onclick="overlayKartaClose()" style="flex:1;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--text2);border-radius:14px;font-size:15px;cursor:pointer;">Zamknij</button>
@@ -608,7 +608,7 @@ z kodem QR lub kodem kreskowym</div>
           <div style="font-size:13px;color:var(--text3);">Kliknij aby wybrać zdjęcie</div>
         </div>
       </label>
-      <input type="file" id="kartyImgInput" accept="image/*" capture="environment" style="display:none;" onchange="kartyImgSelected(this)"/>
+      <input type="file" id="kartyImgInput" accept="image/*" style="display:none;" onchange="kartyImgSelected(this)"/>
     </div>
     <button onclick="kartySave()" class="btn btn-primary" style="margin-bottom:10px;">Zapisz kartę</button>
     <button onclick="overlayKartyAddClose()" class="btn btn-secondary" style="font-size:13px;">Anuluj</button>
@@ -2051,7 +2051,7 @@ function kartyDetail(i){
   if(!card)return;
   _kartyDetailIdx=i;
   document.getElementById("kartaDetailName").textContent=card.name;
-  document.getElementById("kartaDetailSub").textContent="Naciśnij i przytrzymaj kod aby powiekszyć";
+  document.getElementById("kartaDetailSub").textContent="Rozciągnij palcami aby powiększyć kod";
   document.getElementById("kartaDetailImg").src=card.img||"";
   document.getElementById("kartaDeleteBtn").onclick=function(){kartyDelete(i);};
   var ov=document.getElementById("overlayKarta");
@@ -2117,6 +2117,40 @@ function kartySave(){
 var _kartyShow=showScreen;
 showScreen=function(n){_kartyShow(n);if(n==="karty")kartyRender();};
 
+
+// ── Pinch zoom dla karty lojalnościowej ──
+(function(){
+  var img,scale=1,startDist=0;
+  function dist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+  document.addEventListener("touchstart",function(e){
+    var el=document.getElementById("kartaDetailImg");
+    if(!el||!el.parentElement.contains(e.target))return;
+    if(e.touches.length===2){img=el;startDist=dist(e.touches);e.preventDefault();}
+  },{passive:false});
+  document.addEventListener("touchmove",function(e){
+    if(!img||e.touches.length!==2)return;
+    e.preventDefault();
+    var s=Math.min(Math.max(dist(e.touches)/startDist*scale,1),5);
+    img.style.transform="scale("+s+")";
+    img.style.transformOrigin="center center";
+  },{passive:false});
+  document.addEventListener("touchend",function(e){
+    if(!img)return;
+    if(e.touches.length<2){
+      scale=parseFloat((img.style.transform||"scale(1)").replace(/[^0-9.]/g,""))||1;
+      if(scale<=1.05){img.style.transform="scale(1)";scale=1;}
+      img=null;
+    }
+  });
+  // Reset zoom when closing
+  var origClose=window.overlayKartaClose;
+  window.overlayKartaClose=function(){
+    var i=document.getElementById("kartaDetailImg");
+    if(i){i.style.transform="scale(1)";scale=1;}
+    if(origClose)origClose();
+    else{var ov=document.getElementById("overlayKarta");if(ov)ov.style.display="none";}
+  };
+})();
 // INIT
 // ═══════════════════════════════════════
 document.getElementById("inpArr").value=todayStr();
@@ -2162,13 +2196,14 @@ if ('serviceWorker' in navigator) {
     <div style="font-size:20px;font-weight:700;color:#38bdf8;margin-bottom:4px;">🗓️ Wywoź śmieci</div>
     <div style="font-size:12px;color:rgba(255,255,255,.35);margin-bottom:18px;">Wystaw wieczorem — powiadomienie o 18:00</div>
     <div style="display:flex;flex-direction:column;gap:8px;">
-<div style="display:flex;align-items:center;gap:12px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🟢</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">Poniedziałek</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Ekologiczne</div></div><div style="font-size:12px;color:#22c55e;font-weight:700;">18:00</div></div>
-<div style="display:flex;align-items:center;gap:12px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🔵</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">Wtorek</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Papier</div></div><div style="font-size:12px;color:#60a5fa;font-weight:700;">18:00</div></div>
-<div style="display:flex;align-items:center;gap:12px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🟡</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">1. i 3. Środa</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Szkło</div></div><div style="font-size:12px;color:#eab308;font-weight:700;">18:00</div></div>
-<div style="display:flex;align-items:center;gap:12px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🟢</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">Czwartek</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Ekologiczne</div></div><div style="font-size:12px;color:#22c55e;font-weight:700;">18:00</div></div>
-<div style="display:flex;align-items:center;gap:12px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🟡</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">Piątek</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Plastiki & Metale</div></div><div style="font-size:12px;color:#eab308;font-weight:700;">18:00</div></div>
-<div style="display:flex;align-items:center;gap:12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:12px 14px;"><div style="font-size:24px;flex-shrink:0;">🔴</div><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#ffffff;">Niedziela</div><div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:1px;">Niesegregowane</div></div><div style="font-size:12px;color:#ef4444;font-weight:700;">18:00</div></div>
-    </div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🔴</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Poniedziałek</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Niesegregowane</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(120,53,15,.2);border:1px solid rgba(120,53,15,.5);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟤</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Wtorek</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Ekologiczne</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🔵</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">1. i 3. Środa</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Papier</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟢</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Czwartek</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Szkło</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(120,53,15,.2);border:1px solid rgba(120,53,15,.5);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟤</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Piątek</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Ekologiczne</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟡</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Sobota</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Plastiki & Metale</div></div></div>
+<div style="display:flex;align-items:center;gap:14px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🔴</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Niedziela</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Niesegregowane</div></div></div>
+</div>
     <button onclick="document.getElementById('overlayWaste').style.display='none';" style="width:100%;margin-top:20px;padding:14px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;">Zamknij</button>
   </div>
 </div>
