@@ -266,6 +266,13 @@ select.inp{cursor:pointer;}
 .mb4{margin-bottom:4px;}.mb8{margin-bottom:8px;}.mb12{margin-bottom:12px;}.mb14{margin-bottom:14px;}
 .px{padding-left:20px;padding-right:20px;}
 .pt8{padding-top:8px;}
+
+/* ── PIN LOCK ── */
+#pinLock{background:linear-gradient(160deg,#0a0a0f 0%,#0d0d08 50%,#0a0f0a 100%);}
+.pdot{width:14px;height:14px;border-radius:50%;background:rgba(201,169,110,.15);border:1.5px solid rgba(201,169,110,.35);transition:all .2s;}
+.pdot.filled{background:var(--gold2);border-color:var(--gold2);box-shadow:0 0 8px rgba(201,169,110,.5);transform:scale(1.15);}
+.pinbtn{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:var(--text);font-size:26px;font-weight:300;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;user-select:none;}
+.pinbtn:active{background:rgba(201,169,110,.18);border-color:rgba(201,169,110,.4);transform:scale(.93);}
 </style>
 </head>
 <body>
@@ -2234,6 +2241,70 @@ kartySaveAll = function(arr) { _origKartySaveAll(arr); setTimeout(kvPush, 500); 
   }
 })();
 
+
+// ================================================================
+// PIN LOCK — SHA-256
+// Jak to działa: PIN "8472" → hash SHA-256 → długi ciąg znaków
+// W kodzie jest tylko hash — PIN nigdzie nie jest zapisany
+// Przeglądarka hashuje to co wpiszesz i porównuje z hashem
+// ================================================================
+var PIN_HASH = "b912bf62fef4cb0ace94878825bc0636b97640e050389e6c2dbc4ed256e0700d";
+var _pin = "";
+
+async function _pinHash(s) {
+  var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
+}
+
+function _pinDots() {
+  document.querySelectorAll(".pdot").forEach(function(d,i){
+    d.classList.toggle("filled", i < _pin.length);
+  });
+}
+
+function pinKey(n) {
+  if (_pin.length >= 4) return;
+  _pin += String(n);
+  _pinDots();
+  if (_pin.length === 4) setTimeout(_pinCheck, 150);
+}
+
+function pinDel() {
+  _pin = _pin.slice(0,-1);
+  _pinDots();
+  document.getElementById("pinError").textContent = "";
+}
+
+async function _pinCheck() {
+  var entered = await _pinHash(_pin);
+  if (entered === PIN_HASH) {
+    localStorage.setItem("pin_auth","1");
+    var lock = document.getElementById("pinLock");
+    if (lock) { lock.style.opacity="0"; lock.style.transition="opacity .4s"; setTimeout(function(){lock.style.display="none";},400); }
+  } else {
+    var err = document.getElementById("pinError");
+    if (err) err.textContent = "Błędny PIN — spróbuj ponownie";
+    var dots = document.getElementById("pinDots");
+    if (dots) {
+      var s = 0;
+      var iv = setInterval(function(){
+        dots.style.transform = "translateX(" + (s%2===0?10:-10) + "px)";
+        if (++s > 5) { clearInterval(iv); dots.style.transform = ""; }
+      },55);
+    }
+    _pin = "";
+    _pinDots();
+  }
+}
+
+// Pokaż PIN jeśli nie zalogowany
+(function() {
+  if (localStorage.getItem("pin_auth") !== "1") {
+    var lock = document.getElementById("pinLock");
+    if (lock) lock.style.display = "flex";
+  }
+})();
+
 // INIT
 // ═══════════════════════════════════════
 document.getElementById("inpArr").value=todayStr();
@@ -2287,6 +2358,31 @@ if ('serviceWorker' in navigator) {
 <div style="display:flex;align-items:center;gap:14px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟡</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Sobota</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Plastiki & Metale</div></div></div>
 </div>
     <button onclick="document.getElementById('overlayWaste').style.display='none';" style="width:100%;margin-top:20px;padding:14px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;">Zamknij</button>
+  </div>
+</div>
+
+<div id="pinLock" style="display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
+  <div style="text-align:center;margin-bottom:44px;">
+    <img src="logo.png" alt="La Luna" style="height:72px;width:auto;object-fit:contain;margin-bottom:18px;display:block;margin-left:auto;margin-right:auto;"/>
+    <div style="font-size:11px;color:rgba(201,169,110,.45);letter-spacing:2px;text-transform:uppercase;">Wprowadź PIN</div>
+  </div>
+  <div id="pinDots" style="display:flex;gap:18px;margin-bottom:16px;">
+    <div class="pdot"></div><div class="pdot"></div><div class="pdot"></div><div class="pdot"></div>
+  </div>
+  <div id="pinError" style="font-size:13px;color:#ef4444;margin-bottom:28px;min-height:18px;text-align:center;"></div>
+  <div style="display:grid;grid-template-columns:repeat(3,78px);gap:14px;">
+    <button class="pinbtn" onclick="pinKey(1)">1</button>
+    <button class="pinbtn" onclick="pinKey(2)">2</button>
+    <button class="pinbtn" onclick="pinKey(3)">3</button>
+    <button class="pinbtn" onclick="pinKey(4)">4</button>
+    <button class="pinbtn" onclick="pinKey(5)">5</button>
+    <button class="pinbtn" onclick="pinKey(6)">6</button>
+    <button class="pinbtn" onclick="pinKey(7)">7</button>
+    <button class="pinbtn" onclick="pinKey(8)">8</button>
+    <button class="pinbtn" onclick="pinKey(9)">9</button>
+    <div></div>
+    <button class="pinbtn" onclick="pinKey(0)">0</button>
+    <button class="pinbtn" onclick="pinDel()" style="font-size:22px;">⌫</button>
   </div>
 </div>
 </body>
