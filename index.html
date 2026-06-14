@@ -273,12 +273,6 @@ select.inp{cursor:pointer;}
 .pdot.filled{background:var(--gold2);border-color:var(--gold2);box-shadow:0 0 8px rgba(201,169,110,.5);transform:scale(1.15);}
 .pinbtn{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:var(--text);font-size:26px;font-weight:300;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;user-select:none;}
 .pinbtn:active{background:rgba(201,169,110,.18);border-color:rgba(201,169,110,.4);transform:scale(.93);}
-
-/* ── TOAST ── */
-#toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-80px);background:#1a1a2e;border:1px solid rgba(201,169,110,.3);color:var(--text);padding:12px 20px;border-radius:14px;font-size:14px;z-index:9998;transition:transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
-#toast.show{transform:translateX(-50%) translateY(0);}
-#toast.ok{border-color:rgba(74,222,128,.4);color:#4ade80;}
-#toast.err{border-color:rgba(239,68,68,.4);color:#ef4444;}
 </style>
 </head>
 <body>
@@ -546,10 +540,7 @@ select.inp{cursor:pointer;}
 <div class="screen" id="s-rezerwacje">
   <div class="topbar">
     <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Sezon 2026</div></div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <button onclick="rezOcrOpen()" title="Skan screena" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:16px;cursor:pointer;padding:6px 10px;border-radius:10px;">📷 AI</button>
-      <button onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button>
-    </div>
+    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
   </div>
   <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
@@ -594,8 +585,8 @@ z kodem QR lub kodem kreskowym</div>
     <div id="kartaDetailName" style="font-size:24px;font-weight:700;color:var(--gold2);text-align:center;margin-bottom:6px;"></div>
     <div id="kartaDetailSub" style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:24px;"></div>
     <!-- Code image -->
-    <div id="kartaImgWrap" style="background:#ffffff;border-radius:20px;padding:20px;text-align:center;margin-bottom:20px;flex:1;display:flex;align-items:center;justify-content:center;cursor:zoom-in;transition:all .3s;" onclick="kartaZoomToggle()">
-      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:12px;touch-action:pinch-zoom;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;" oncontextmenu="return false;" draggable="false"/>
+    <div style="background:#ffffff;border-radius:20px;padding:24px;text-align:center;margin-bottom:20px;">
+      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;touch-action:pinch-zoom;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;" oncontextmenu="return false;" draggable="false"/>
     </div>
     <div style="display:flex;gap:10px;">
       <button onclick="overlayKartaClose()" style="flex:1;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--text2);border-radius:14px;font-size:15px;cursor:pointer;">Zamknij</button>
@@ -665,10 +656,7 @@ z kodem QR lub kodem kreskowym</div>
 <div class="overlay" id="overlaySettings" onclick="if(event.target===this)closeSettings()">
   <div class="overlay-sheet">
     <div class="sheet-handle"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-      <div class="sheet-title" style="margin-bottom:0;">Ustawienia</div>
-      <button onclick="closeSettings()" style="background:rgba(255,255,255,.08);border:none;color:var(--text3);width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
-    </div>
+    <div class="sheet-title">Ustawienia</div>
     <div class="sheet-sub">La Luna di Bastremoli · L10046</div>
 
     <div style="background:linear-gradient(135deg,rgba(56,189,248,.12),rgba(14,165,233,.06));border:1px solid rgba(56,189,248,.25);border-radius:16px;padding:14px 16px;margin-bottom:16px;">
@@ -698,7 +686,6 @@ z kodem QR lub kodem kreskowym</div>
       <label class="field-lbl">Adres serwera Vercel (powiadomienia push)</label>
       <input id="serverInput" class="inp" type="url" placeholder="https://twoje-repo.vercel.app" style="font-size:13px;"/>
       <button onclick="saveServerInput()" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">Zapisz adres</button>
-      <div id="serverSaved" style="font-size:12px;color:#4ade80;margin-top:6px;display:none;">✓ Adres zapisany</div>
     </div>
     <div class="field-group" style="margin-bottom:12px;">
       <label class="field-lbl">&#x1f4c5; Link iCal (Airbnb / Booking)</label>
@@ -1512,10 +1499,6 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
 
 function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
   var s=0;
-  if(!groups.length){
-    extras.forEach(function(ex){var ea=Math.round(ex.amt);s+=ex.sign>0?ea:-ea;});
-    return s;
-  }
   groups.forEach(function(gr){
     if(cleaning)s+=150;
     if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);s+=pa;}
@@ -1579,18 +1562,8 @@ function rzCommit(){
   var ph=parseFloat(document.getElementById("rz-poolH").value)||0;
   var pcEl=document.getElementById("rz-poolC");
   var pca=parseFloat(pcEl.value);var usePC=!isNaN(pca)&&pcEl.dataset.m==="1";
-  var lines;
-  if(rzGroups.length>0){
-    lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
-  } else {
-    // Brak grup — dodaj tylko extras jako pozycje globalne
-    lines=[];
-    rzExtras.forEach(function(ex){
-      var ea=Math.round(ex.amt);
-      lines.push(ex.sign>0?"- +   "+ea+"\u20AC ("+ex.desc+")":"- -   "+ea+"\u20AC ("+ex.desc+")");
-    });
-  }
-  if(!lines.length){alert("Dodaj pozycje lub grup\u0119");return false;}
+  var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
+  if(!lines.length){alert("Dodaj najpierw grupy go\u015Bci");return false;}
   var data=rzLoad();
   var delta=rzCalcDelta(rzGroups,rzExtras,cleaning,ph,usePC,pca);
   data.saldo+=delta;
@@ -1622,12 +1595,12 @@ function rzFullText(){
 }
 
 document.getElementById("btnRzShare").addEventListener("click",function(){
-  if(rzGroups.length||rzExtras.length){if(!rzCommit())return;}
+  if(rzGroups.length){if(!rzCommit())return;}
   var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
   window.open("https://wa.me/?text="+encodeURIComponent(rzFullText()),"_blank");
 });
 document.getElementById("btnRzCopy").addEventListener("click",function(){
-  if(rzGroups.length||rzExtras.length)rzCommit();
+  if(rzGroups.length)rzCommit();
   var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
   var txt=rzFullText();
   var ok=document.getElementById("rz-copyOk");
@@ -1684,7 +1657,6 @@ async function icalSync(){
     var r=await fetch(server+"/api/ical-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({icalUrl:url})});
     var d=await r.json();
     if(st){st.style.color=d.ok?"#4ade80":"#ef4444";st.textContent=d.ok?"✓ "+d.events+" rezerwacji, "+d.scheduled+" powiadomień":"Błąd: "+(d.error||"?");}
-    toast(d.ok?"✓ iCal zsynchronizowany":"Błąd sync",d.ok?"ok":"err");
   }catch(e){
     if(st){st.style.color="#ef4444";st.textContent="Błąd połączenia: "+e.message;}
   }
@@ -1781,7 +1753,7 @@ function rezRender(){
     var adults=ev.adults||"?";
     var kids=ev.children||"0";
     var country=ev.country||"";
-    tb+='<tr style="background:'+bg+';cursor:pointer;" onclick="rezEditByUid(\''+encodeURIComponent(ev.uid||ev.start)+'\')">'
+    tb+='<tr style="background:'+bg+';" onclick="rezEdit('+i+')">'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.start)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.end)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+(ev._name||name)+(name.indexOf('*')>=0&&!ev._name?' <span style="color:var(--gold2);font-size:11px;">✏️</span>':'')+'</td>'
@@ -1794,15 +1766,6 @@ function rezRender(){
   el.innerHTML=th+tb;
 }
 
-function rezEditByUid(uidEnc){
-  var uid=decodeURIComponent(uidEnc);
-  var idx=-1;
-  for(var i=0;i<rezData.length;i++){
-    if((rezData[i].uid||rezData[i].start)===uid){idx=i;break;}
-  }
-  if(idx<0)return;
-  rezEdit(idx);
-}
 function rezEdit(i){
   var ev=rezData[i];
   var name=(ev.summary||"").replace(/\s*[-–].*$/,"").trim();
@@ -1963,11 +1926,10 @@ showScreen=function(n){_rezShow(n);if(n==="rezerwacje")rezRender();};
 // ================================================================
 function saveServerInput(){
   var v=(document.getElementById("serverInput").value||"").trim().replace(/\/$/,"");
-  if(!v){toast("Wpisz adres serwera","err");return;}
+  if(!v){alert("Wpisz adres serwera");return;}
   localStorage.setItem("push_server",v);
-  var ss=document.getElementById("serverSaved");
-  if(ss){ss.style.display="block";setTimeout(function(){ss.style.display="none";},3000);}
-  toast("✓ Adres serwera zapisany","ok");
+  var ps=document.getElementById("pushStatus");
+  if(ps){ps.textContent="✓ Adres zapisany: "+v;ps.style.color="#4ade80";}
 }
 
 function frSave(){
@@ -2061,70 +2023,15 @@ function showWasteSchedule(){
 // ================================================================
 // KARTY LOJALNOŚCIOWE
 // ================================================================
-var KARTY_KEY="loyalty_cards_v2";
+var KARTY_KEY="loyalty_cards";
 var _kartyAddImgData="";
 var _kartyDetailIdx=-1;
-var _kartyDB=null;
 
-// IndexedDB — brak limitu rozmiaru
-function kartyDBInit(cb){
-  if(_kartyDB){cb(_kartyDB);return;}
-  var req=indexedDB.open("LunaKarty",1);
-  req.onupgradeneeded=function(e){
-    e.target.result.createObjectStore("karty",{keyPath:"id",autoIncrement:true});
-  };
-  req.onsuccess=function(e){_kartyDB=e.target.result;cb(_kartyDB);};
-  req.onerror=function(){cb(null);};
-}
-
-function kartyLoad(){
-  // Synchroniczny fallback z localStorage (dla szybkości przy starcie)
-  try{return JSON.parse(localStorage.getItem(KARTY_KEY)||"[]");}catch(e){return[];}
-}
-
-function kartySaveAll(arr){
-  // Zapisz podgląd (bez img) do localStorage dla szybkości
-  var preview=arr.map(function(c){return{name:c.name,id:c.id,added:c.added};});
-  try{localStorage.setItem(KARTY_KEY,JSON.stringify(arr));}catch(e){
-    // Przekroczono limit — zapisz bez obrazów
-    var noImg=arr.map(function(c){return{name:c.name,id:c.id,added:c.added,img:c.img?c.img.slice(0,100)+"...":""};});
-    try{localStorage.setItem(KARTY_KEY,JSON.stringify(noImg));}catch(e2){console.log("Storage full");}
-  }
-  // Zawsze zapisz pełne dane (z img) do IndexedDB
-  kartyDBInit(function(db){
-    if(!db)return;
-    var tx=db.transaction("karty","readwrite");
-    var store=tx.objectStore("karty");
-    store.clear();
-    arr.forEach(function(c,i){store.put({id:i+1,name:c.name,img:c.img||"",added:c.added||0});});
-  });
-}
-
-function kartyLoadFull(cb){
-  // Załaduj pełne dane (z img) z IndexedDB
-  kartyDBInit(function(db){
-    if(!db){cb(kartyLoad());return;}
-    var tx=db.transaction("karty","readonly");
-    var req=tx.objectStore("karty").getAll();
-    req.onsuccess=function(e){
-      var arr=e.target.result||[];
-      arr.sort(function(a,b){return a.id-b.id;});
-      // Zsynchronizuj z localStorage
-      if(arr.length>0){
-        try{localStorage.setItem(KARTY_KEY,JSON.stringify(arr));}catch(e){}
-      }
-      cb(arr);
-    };
-    req.onerror=function(){cb(kartyLoad());};
-  });
-}
+function kartyLoad(){try{return JSON.parse(localStorage.getItem(KARTY_KEY)||"[]");}catch(e){return [];}}
+function kartySaveAll(arr){localStorage.setItem(KARTY_KEY,JSON.stringify(arr));}
 
 function kartyRender(){
-  kartyLoadFull(function(cards){
-  _kartyRenderInner(cards);
-  });
-}
-function _kartyRenderInner(cards){
+  var cards=kartyLoad();
   var empty=document.getElementById("kartyEmpty");
   var grid=document.getElementById("kartyGrid");
   var list=document.getElementById("kartyList");
@@ -2149,17 +2056,9 @@ function _kartyRenderInner(cards){
       +'<div style="font-size:12px;color:var(--text3);margin-top:2px;">Kliknij aby zobaczyć kod</div>'
       +'</div>'
       +'<div style="color:var(--gold2);font-size:20px;">›</div>';
-    // Handle po prawej stronie (drag)
-    el.innerHTML += '<div class="karta-handle" style="cursor:grab;padding:8px 4px;color:rgba(255,255,255,.25);font-size:20px;flex-shrink:0;user-select:none;">&#9776;</div>';
-    el.dataset.idx=i;
-    el.onclick=function(ev){
-      if(ev.target.classList.contains("karta-handle"))return;
-      kartyDetail(i);
-    };
-
+    el.onclick=function(){kartyDetail(i);};
     list.appendChild(el);
   });
-  setTimeout(kartyInitDrag, 50);
 }
 
 function kartyDetail(i){
@@ -2168,7 +2067,7 @@ function kartyDetail(i){
   if(!card)return;
   _kartyDetailIdx=i;
   document.getElementById("kartaDetailName").textContent=card.name;
-  document.getElementById("kartaDetailSub").textContent="Przyciśnij i przytrzymaj aby przybliżyć";
+  document.getElementById("kartaDetailSub").textContent="Rozciągnij palcami aby powiększyć kod";
   document.getElementById("kartaDetailImg").src=card.img||"";
   document.getElementById("kartaDeleteBtn").onclick=function(){kartyDelete(i);};
   var ov=document.getElementById("overlayKarta");
@@ -2182,12 +2081,11 @@ function overlayKartaClose(){
 
 function kartyDelete(i){
   if(!confirm("Usunąć tę kartę?"))return;
-  kartyLoadFull(function(cards){
+  var cards=kartyLoad();
   cards.splice(i,1);
   kartySaveAll(cards);
   overlayKartaClose();
   kartyRender();
-  });
 }
 
 function kartyAdd(){
@@ -2209,23 +2107,13 @@ function kartyImgSelected(input){
   if(!file)return;
   var reader=new FileReader();
   reader.onload=function(e){
-    // Kompresuj do max 900px i jakość 0.75
-    var imgEl=new Image();
-    imgEl.onload=function(){
-      var MAX=900;
-      var w=imgEl.width,wh=imgEl.height;
-      if(w>MAX||wh>MAX){var r=Math.min(MAX/w,MAX/wh);w=Math.round(w*r);wh=Math.round(wh*r);}
-      var cv=document.createElement("canvas");cv.width=w;cv.height=wh;
-      cv.getContext("2d").drawImage(imgEl,0,0,w,wh);
-      _kartyAddImgData=cv.toDataURL("image/jpeg",0.75);
-      var prev=document.getElementById("kartyImgPreview");
-      var pi=document.getElementById("kartyImgPreviewImg");
-      var ph=document.getElementById("kartyImgPlaceholder");
-      if(pi)pi.src=_kartyAddImgData;
-      if(prev)prev.style.display="block";
-      if(ph)ph.style.display="none";
-    };
-    imgEl.src=e.target.result;
+    _kartyAddImgData=e.target.result;
+    var prev=document.getElementById("kartyImgPreview");
+    var img=document.getElementById("kartyImgPreviewImg");
+    var ph=document.getElementById("kartyImgPlaceholder");
+    if(img)img.src=_kartyAddImgData;
+    if(prev)prev.style.display="block";
+    if(ph)ph.style.display="none";
   };
   reader.readAsDataURL(file);
 }
@@ -2234,12 +2122,11 @@ function kartySave(){
   var name=(document.getElementById("kartyAddName").value||"").trim();
   if(!name){alert("Wpisz nazwę karty");return;}
   if(!_kartyAddImgData){alert("Dodaj zdjęcie kodu");return;}
-  kartyLoadFull(function(cards){
-    cards.push({name:name,img:_kartyAddImgData,added:Date.now()});
-    kartySaveAll(cards);
-    overlayKartyAddClose();
-    kartyRender();
-  });
+  var cards=kartyLoad();
+  cards.push({name:name,img:_kartyAddImgData,added:Date.now()});
+  kartySaveAll(cards);
+  overlayKartyAddClose();
+  kartyRender();
 }
 
 // Patch showScreen for karty
@@ -2411,241 +2298,113 @@ async function _pinCheck() {
 }
 
 // Pokaż PIN jeśli nie zalogowany
-var PIN_VERSION="v2";
-(function(){
-  var auth=localStorage.getItem("pin_auth");
-  var ver=localStorage.getItem("pin_ver");
-  var ts=parseInt(localStorage.getItem("pin_ts")||"0");
-  var lock=document.getElementById("pinLock");
-  if(auth==="1"&&ver===PIN_VERSION&&Date.now()-ts<86400000){
-    if(lock)lock.style.display="none";
-    return;
-  }
-  if(lock)lock.style.display="flex";
-  if(window.PublicKeyCredential){
-    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function(a){
-      var b=document.getElementById("pinBioBtn");
-      if(a&&b)b.style.display="flex";
-    }).catch(function(){});
+(function() {
+  if (localStorage.getItem("pin_auth") !== "1") {
+    var lock = document.getElementById("pinLock");
+    if (lock) lock.style.display = "flex";
   }
 })();
 
-function pinBiometric(){
-  if(!window.PublicKeyCredential)return;
-  var ch=new Uint8Array(32);crypto.getRandomValues(ch);
-  navigator.credentials.get({publicKey:{challenge:ch,timeout:60000,userVerification:"required",rpId:window.location.hostname}})
-    .then(function(){_pinSuccess();})
-    .catch(function(){});
+
+// IndexedDB dla kart (brak limitu rozmiaru)
+var _idb=null;
+function idbOpen(cb){
+  if(_idb){cb(_idb);return;}
+  var r=indexedDB.open('LunaKarty',1);
+  r.onupgradeneeded=function(e){e.target.result.createObjectStore('karty',{keyPath:'pos'});};
+  r.onsuccess=function(e){_idb=e.target.result;cb(_idb);};
+  r.onerror=function(){cb(null);};
 }
-
-function _pinSuccess(){
-  localStorage.setItem("pin_auth","1");
-  localStorage.setItem("pin_ver",PIN_VERSION);
-  localStorage.setItem("pin_ts",String(Date.now()));
-  var lock=document.getElementById("pinLock");
-  if(lock){lock.style.opacity="0";lock.style.transition="opacity .4s";setTimeout(function(){lock.style.display="none";},400);}
-}
-
-
-
-function toast(msg,type,dur){
-  var el=document.getElementById("toast");
-  if(!el)return;
-  el.textContent=msg;
-  el.className=(type==="ok"?"ok":type==="err"?"err":"");
-  el.classList.add("show");
-  clearTimeout(el._t);
-  el._t=setTimeout(function(){el.classList.remove("show");},dur||2500);
-}
-// Zastąp natywne alerty
-var _nativeAlert=window.alert;
-window.alert=function(msg){
-  if(typeof msg==="string"&&msg.length<120)toast
-// ── OCR dla rezerwacji przez Gemini ──
-var _ocrImgData = '';
-
-function rezOcrOpen() {
-  _ocrImgData = '';
-  document.getElementById('ocrPreviewWrap').style.display = 'none';
-  document.getElementById('ocrPlaceholder').style.display = 'block';
-  document.getElementById('ocrStatus').textContent = '';
-  var inp = document.getElementById('ocrImgInput');
-  if (inp) inp.value = '';
-  var ov = document.getElementById('overlayOcr');
-  if (ov) ov.style.display = 'flex';
-}
-
-function ocrImgSelected(input) {
-  var file = input.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    _ocrImgData = e.target.result;
-    var prev = document.getElementById('ocrPreviewWrap');
-    var img = document.getElementById('ocrPreviewImg');
-    var ph = document.getElementById('ocrPlaceholder');
-    if (img) img.src = _ocrImgData;
-    if (prev) prev.style.display = 'block';
-    if (ph) ph.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
-}
-
-async function ocrAnalyze() {
-  var st = document.getElementById('ocrStatus');
-  if (!_ocrImgData) { if(st) st.textContent = 'Wybierz najpierw screenshot'; return; }
-  var apiKey = getApiKey ? getApiKey() : localStorage.getItem('gemini_key') || '';
-  if (!apiKey) { if(st) st.textContent = 'Brak klucza Gemini API — dodaj w Ustawieniach'; return; }
-
-  if (st) { st.style.color = 'var(--gold2)'; st.textContent = 'Analizuję...'; }
-
-  var base64 = _ocrImgData.split(',')[1];
-  var mime = _ocrImgData.split(';')[0].split(':')[1];
-
-  var prompt = 'Na tym screenshocie z aplikacji Airbnb lub Booking.com znajdź dane rezerwacji. '
-    + 'Wyciągnij: imię i nazwisko gościa (pełne), liczbę dorosłych, liczbę dzieci, kraj zamieszkania (jeśli widoczny), '
-    + 'datę zameldowania (check-in), datę wymeldowania (check-out). '
-    + 'Odpowiedz TYLKO w formacie JSON (bez markdown, bez ```), np: '
-    + '{"name":"Jan Kowalski","adults":"4","children":"2","country":"Polska","checkin":"2026-07-10","checkout":"2026-07-17"} '
-    + 'Jeśli jakiegoś pola nie ma, wpisz pusty string "".';
-
-  try {
-    var resp = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mime, data: base64 } }
-            ]
-          }]
-        })
-      }
-    );
-    var data = await resp.json();
-    var text = (data.candidates && data.candidates[0] && data.candidates[0].content &&
-                data.candidates[0].content.parts && data.candidates[0].content.parts[0].text) || '';
-
-    // Parse JSON
-    var clean = text.replace(/```json|```/g, '').trim();
-    var parsed = JSON.parse(clean);
-
-    // Znajdź pasującą rezerwację lub utwórz nową
-    var matched = false;
-    if (parsed.checkin && parsed.checkout) {
-      for (var i = 0; i < rezData.length; i++) {
-        var evStart = rezData[i].start ? rezData[i].start.slice(0,10) : '';
-        var evEnd   = rezData[i].end   ? rezData[i].end.slice(0,10)   : '';
-        if (evStart === parsed.checkin || evEnd === parsed.checkout) {
-          if (parsed.name)     rezData[i]._name    = parsed.name;
-          if (parsed.adults)   rezData[i].adults   = parsed.adults;
-          if (parsed.children) rezData[i].children = parsed.children;
-          if (parsed.country)  rezData[i].country  = parsed.country;
-          matched = true;
-          break;
-        }
-      }
-    }
-    if (!matched && parsed.name) {
-      // Dodaj jako nowy wpis
-      rezData.push({
-        uid: 'ocr_' + Date.now(),
-        start: parsed.checkin || '',
-        end:   parsed.checkout || '',
-        summary: parsed.name,
-        _name:    parsed.name,
-        adults:   parsed.adults,
-        children: parsed.children,
-        country:  parsed.country
-      });
-    }
-
-    localStorage.setItem('rez_cache', JSON.stringify(rezData));
-    if (st) { st.style.color = '#4ade80'; st.textContent = '\u2713 Odczytano: ' + (parsed.name||'?') + ', ' + (parsed.adults||'?') + ' dor., ' + (parsed.children||'0') + ' dz.'; }
-    setTimeout(function() {
-      document.getElementById('overlayOcr').style.display = 'none';
-      rezRender();
-    }, 1500);
-
-  } catch(e) {
-    if (st) { st.style.color = '#ef4444'; st.textContent = 'B\u0142\u0105d: ' + e.message; }
-  }
-}
-(msg,"",3000);
-  else _nativeAlert(msg);
-};
-
-function kartaZoomToggle(){
-  var src=document.getElementById("kartaDetailImg").src;
-  var ov=document.getElementById("kartaZoom");
-  var zi=document.getElementById("kartaZoomImg");
-  if(ov.style.display==="flex"){ov.style.display="none";return;}
-  if(zi)zi.src=src;
-  ov.style.display="flex";
-}
-
-// ── Touch sortable dla kart lojalnościowych ──
-var _dragSrc = null, _dragSrcIdx = -1;
-
-function kartyInitDrag() {
-  var list = document.getElementById('kartyList');
-  if (!list) return;
-  var items = list.querySelectorAll('[data-idx]');
-  items.forEach(function(el) {
-    var handle = el.querySelector('.karta-handle');
-    if (!handle) return;
-    var startY, startEl, clone, origIdx;
-
-    handle.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-      origIdx = parseInt(el.dataset.idx);
-      startY = e.touches[0].clientY;
-      startEl = el;
-      // Utwórz clone
-      clone = el.cloneNode(true);
-      clone.style.cssText = 'position:fixed;left:' + el.getBoundingClientRect().left + 'px;'
-        + 'top:' + el.getBoundingClientRect().top + 'px;width:' + el.offsetWidth + 'px;'
-        + 'opacity:.85;z-index:999;pointer-events:none;border:1px solid rgba(201,169,110,.5);'
-        + 'border-radius:20px;background:#1a1a2e;';
-      document.body.appendChild(clone);
-      el.style.opacity = '.3';
-    }, {passive: false});
-
-    handle.addEventListener('touchmove', function(e) {
-      e.preventDefault();
-      if (!clone) return;
-      var dy = e.touches[0].clientY - startY;
-      clone.style.transform = 'translateY(' + dy + 'px)';
-      // Znajdź element pod palcem
-      clone.style.pointerEvents = 'none';
-      var underEl = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
-      var targetRow = underEl ? underEl.closest('[data-idx]') : null;
-      list.querySelectorAll('[data-idx]').forEach(function(r) { r.style.borderTop = ''; });
-      if (targetRow && targetRow !== startEl) {
-        targetRow.style.borderTop = '2px solid var(--gold2)';
-      }
-    }, {passive: false});
-
-    handle.addEventListener('touchend', function(e) {
-      if (!clone) return;
-      clone.remove(); clone = null;
-      startEl.style.opacity = '1';
-      list.querySelectorAll('[data-idx]').forEach(function(r) { r.style.borderTop = ''; });
-      var underEl = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-      var targetRow = underEl ? underEl.closest('[data-idx]') : null;
-      if (targetRow && targetRow !== startEl) {
-        var toIdx = parseInt(targetRow.dataset.idx);
-        var cards = kartyLoad();
-        var moved = cards.splice(origIdx, 1)[0];
-        cards.splice(toIdx, 0, moved);
-        kartySaveAll(cards);
-        kartyRender();
-      }
-    });
+function idbSave(arr,cb){
+  idbOpen(function(db){
+    if(!db){if(cb)cb();return;}
+    var tx=db.transaction('karty','readwrite'),st=tx.objectStore('karty');
+    st.clear();
+    arr.forEach(function(c,i){st.put({pos:i,name:c.name,img:c.img||'',added:c.added||0});});
+    tx.oncomplete=function(){if(cb)cb();};
   });
+}
+function idbLoad(cb){
+  idbOpen(function(db){
+    if(!db){cb([]);return;}
+    var tx=db.transaction('karty','readonly'),req=tx.objectStore('karty').getAll();
+    req.onsuccess=function(e){cb((e.target.result||[]).sort(function(a,b){return a.pos-b.pos;}));};
+    req.onerror=function(){cb([]);};
+  });
+}
+// Patch kartySaveAll i kartyLoad
+var _origKartySaveAll=kartySaveAll;
+kartySaveAll=function(arr){
+  idbSave(arr);
+  try{_origKartySaveAll(arr);}catch(e){
+    var slim=arr.map(function(c){return{name:c.name,pos:c.pos,added:c.added};});
+    try{localStorage.setItem('loyalty_cards',JSON.stringify(slim));}catch(e2){}
+  }
+};
+// Przy starcie wczytaj z IDB i odśwież
+idbLoad(function(arr){
+  if(arr&&arr.length>0){
+    try{localStorage.setItem('loyalty_cards',JSON.stringify(arr));}catch(e){}
+    if(typeof kartyRender==='function'){
+      var cur=document.getElementById('s-karty');
+      if(cur&&cur.classList.contains('active'))kartyRender();
+    }
+  }
+});
+
+// OCR Gemini dla rezerwacji
+var _ocrImg='';
+function rezOcrOpen(){
+  _ocrImg='';
+  document.getElementById('ocrPrev').style.display='none';
+  document.getElementById('ocrPH').style.display='block';
+  document.getElementById('ocrSt').textContent='';
+  document.getElementById('ocrInput').value='';
+  document.getElementById('overlayOcr').style.display='flex';
+}
+function ocrImgSel(inp){
+  var file=inp.files[0];if(!file)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    _ocrImg=e.target.result;
+    document.getElementById('ocrPrevImg').src=_ocrImg;
+    document.getElementById('ocrPrev').style.display='block';
+    document.getElementById('ocrPH').style.display='none';
+  };
+  r.readAsDataURL(file);
+}
+async function ocrGo(){
+  var st=document.getElementById('ocrSt');
+  if(!_ocrImg){st.textContent='Wybierz screenshot';return;}
+  var key=localStorage.getItem('gemini_key')||'';
+  if(!key){st.style.color='#ef4444';st.textContent='Brak klucza Gemini w Ustawieniach';return;}
+  st.style.color='var(--gold2)';st.textContent='Analizuję...';
+  var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
+  var prompt='Z tego screenshota wyciągnij dane rezerwacji. Odpowiedz TYLKO jako JSON: {"name":"","adults":"","children":"","country":"","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}';
+  try{
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}]})
+    });
+    var d=await resp.json();
+    var txt=((d.candidates||[])[0]||{}).content;
+    txt=txt?(txt.parts||[])[0].text||'':'';
+    var p=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    var matched=false;
+    for(var i=0;i<rezData.length;i++){
+      if((rezData[i].start||'').slice(0,10)===p.checkin||(rezData[i].end||'').slice(0,10)===p.checkout){
+        if(p.name)rezData[i]._name=p.name;
+        if(p.adults)rezData[i].adults=p.adults;
+        if(p.children)rezData[i].children=p.children;
+        if(p.country)rezData[i].country=p.country;
+        matched=true;break;
+      }
+    }
+    if(!matched&&p.name)rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',summary:p.name,_name:p.name,adults:p.adults,children:p.children,country:p.country});
+    localStorage.setItem('rez_cache',JSON.stringify(rezData));
+    st.style.color='#4ade80';st.textContent='✓ '+( p.name||'?')+' | dor:'+( p.adults||'?')+' dz:'+(p.children||'0');
+    setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
+  }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
 // INIT
 // ═══════════════════════════════════════
@@ -2711,8 +2470,7 @@ if ('serviceWorker' in navigator) {
   <div id="pinDots" style="display:flex;gap:18px;margin-bottom:16px;">
     <div class="pdot"></div><div class="pdot"></div><div class="pdot"></div><div class="pdot"></div>
   </div>
-  <div id="pinError" style="font-size:13px;color:#ef4444;margin-bottom:16px;min-height:18px;text-align:center;"></div>
-  <button id="pinBioBtn" onclick="pinBiometric()" style="display:none;align-items:center;gap:8px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);border-radius:14px;padding:12px 24px;font-size:14px;cursor:pointer;margin-bottom:16px;">🤚 Odcisk palca / Face ID</button>
+  <div id="pinError" style="font-size:13px;color:#ef4444;margin-bottom:28px;min-height:18px;text-align:center;"></div>
   <div style="display:grid;grid-template-columns:repeat(3,78px);gap:14px;">
     <button class="pinbtn" onclick="pinKey(1)">1</button>
     <button class="pinbtn" onclick="pinKey(2)">2</button>
@@ -2728,28 +2486,7 @@ if ('serviceWorker' in navigator) {
     <button class="pinbtn" onclick="pinDel()" style="font-size:22px;">⌫</button>
   </div>
 </div>
-<div id="toast"></div>
-
-<div id="kartaZoom" onclick="kartaZoomToggle()" style="display:none;position:fixed;inset:0;z-index:600;background:#000;align-items:center;justify-content:center;padding:16px;">
-  <img id="kartaZoomImg" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;-webkit-touch-callout:none;user-select:none;" oncontextmenu="return false;" draggable="false"/>
-  <div style="position:absolute;top:16px;right:16px;color:rgba(255,255,255,.5);font-size:28px;background:rgba(0,0,0,.4);width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;">×</div>
-</div>
-
-<div id="overlayOcr" onclick="if(event.target===this)document.getElementById('overlayOcr').style.display='none';" style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);align-items:flex-end;justify-content:center;">
-  <div style="width:100%;max-width:430px;background:linear-gradient(180deg,#131318,#0d0d12);border-radius:24px 24px 0 0;padding:24px 20px 44px;">
-    <div style="width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 18px;"></div>
-    <div style="font-size:19px;font-weight:700;color:var(--gold2);margin-bottom:4px;">🤖 Skan screena AI</div>
-    <div style="font-size:13px;color:var(--text3);margin-bottom:20px;">Wrzuć screenshot z Airbnb/Booking — AI odczyta dane i uzupełni tabelę</div>
-    <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,.04);border:2px dashed rgba(201,169,110,.3);border-radius:16px;padding:28px;cursor:pointer;margin-bottom:16px;" onclick="document.getElementById('ocrImgInput').click()">
-      <div id="ocrPreviewWrap" style="display:none;width:100%;text-align:center;"><img id="ocrPreviewImg" style="max-width:100%;max-height:200px;border-radius:10px;object-fit:contain;"/></div>
-      <div id="ocrPlaceholder" style="text-align:center;"><div style="font-size:36px;margin-bottom:6px;">📱</div><div style="font-size:13px;color:var(--text3);">Kliknij aby wybrać screenshot</div></div>
-    </label>
-    <input type="file" id="ocrImgInput" accept="image/*" style="display:none;" onchange="ocrImgSelected(this)"/>
-    <div id="ocrStatus" style="font-size:13px;color:var(--text3);margin-bottom:12px;min-height:18px;"></div>
-    <button onclick="ocrAnalyze()" class="btn btn-primary" style="margin-bottom:10px;">🧠 Analizuj przez AI</button>
-    <button onclick="document.getElementById('overlayOcr').style.display='none';" class="btn btn-secondary" style="font-size:13px;">Anuluj</button>
-  </div>
-</div>
+<div id="overlayOcr" onclick="if(event.target===this)this.style.display='none';" style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);align-items:flex-end;justify-content:center;"><div style="width:100%;max-width:430px;background:#131318;border-radius:24px 24px 0 0;padding:24px 20px 44px;"><div style="width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 18px;"></div><div style="font-size:19px;font-weight:700;color:var(--gold2);margin-bottom:4px;">🤖 Skan AI</div><div style="font-size:13px;color:var(--text3);margin-bottom:18px;">Screenshot z Airbnb/Booking → AI uzupełni dane</div><label style="display:flex;flex-direction:column;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:2px dashed rgba(201,169,110,.3);border-radius:16px;padding:24px;cursor:pointer;margin-bottom:14px;" onclick="document.getElementById('ocrInput').click()"><div id="ocrPrev" style="display:none;width:100%;text-align:center;"><img id="ocrPrevImg" style="max-width:100%;max-height:180px;border-radius:10px;object-fit:contain;"/></div><div id="ocrPH"><div style="font-size:36px;">📱</div><div style="font-size:13px;color:var(--text3);">Wybierz screenshot</div></div></label><input type="file" id="ocrInput" accept="image/*" style="display:none;" onchange="ocrImgSel(this)"/><div id="ocrSt" style="font-size:13px;color:var(--text3);min-height:20px;margin-bottom:12px;"></div><button onclick="ocrGo()" class="btn btn-primary" style="margin-bottom:10px;">🧠 Analizuj</button><button onclick="document.getElementById('overlayOcr').style.display='none';" class="btn btn-secondary" style="font-size:13px;">Anuluj</button></div></div>
 </body>
 </html>
 
