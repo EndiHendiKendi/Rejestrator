@@ -2447,31 +2447,6 @@ function _pinSuccess(){
 }
 
 
-// ── Back button / historia ekranów ──
-var _screenHistory=["dane"];
-var _origShowScreen2=showScreen;
-showScreen=function(name){
-  _origShowScreen2(name);
-  if(_screenHistory[_screenHistory.length-1]!==name)_screenHistory.push(name);
-};
-window.addEventListener("popstate",function(e){
-  // Zamknij otwarte overlaye
-  var overlays=["overlayKarta","overlayKartyAdd","overlayWaste","overlayFirstRun","overlaySettings"];
-  var closed=false;
-  overlays.forEach(function(id){
-    var el=document.getElementById(id);
-    if(el&&el.style.display!=="none"&&el.style.display!==""){
-      el.style.display="none";closed=true;
-    }
-  });
-  if(!closed&&_screenHistory.length>1){
-    _screenHistory.pop();
-    _origShowScreen2(_screenHistory[_screenHistory.length-1]);
-  }
-  history.pushState(null,"",location.href);
-});
-history.pushState(null,"",location.href);
-
 
 function toast(msg,type,dur){
   var el=document.getElementById("toast");
