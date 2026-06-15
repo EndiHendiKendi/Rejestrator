@@ -585,8 +585,8 @@ z kodem QR lub kodem kreskowym</div>
     <div id="kartaDetailName" style="font-size:24px;font-weight:700;color:var(--gold2);text-align:center;margin-bottom:6px;"></div>
     <div id="kartaDetailSub" style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:24px;"></div>
     <!-- Code image -->
-    <div style="background:#ffffff;border-radius:20px;padding:24px;text-align:center;margin-bottom:20px;">
-      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;touch-action:pinch-zoom;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;" oncontextmenu="return false;" draggable="false"/>
+    <div id="kartaImgBox" style="background:#ffffff;border-radius:20px;padding:24px;text-align:center;margin-bottom:20px;display:none;">
+      <img id="kartaDetailImg" src="" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;touch-action:pinch-zoom;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;" oncontextmenu="return false;" draggable="false" onload="document.getElementById('kartaImgBox').style.display='block';" onerror="document.getElementById('kartaImgBox').style.display='none';"/>
     </div>
     <div style="display:flex;gap:10px;">
       <button onclick="overlayKartaClose()" style="flex:1;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--text2);border-radius:14px;font-size:15px;cursor:pointer;">Zamknij</button>
@@ -1494,6 +1494,14 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
       lines.push(ex.sign>0?"- +   "+ea+"\u20AC ("+ex.desc+")":"- -   "+ea+"\u20AC ("+ex.desc+")");
     });
   });
+  // If no groups but there are extras, add them as standalone "Inne" block
+  if(!groups.length&&extras.length){
+    lines.push("\u200B\uD83D\uDEE0 *Inne*");
+    extras.forEach(function(ex){
+      var ea=Math.round(ex.amt);
+      lines.push(ex.sign>0?"- +   "+ea+"\u20AC ("+ex.desc+")":"- -   "+ea+"\u20AC ("+ex.desc+")");
+    });
+  }
   return lines;
 }
 
@@ -1504,6 +1512,10 @@ function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
     if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);s+=pa;}
     extras.forEach(function(ex){var ea=Math.round(ex.amt);s+=ex.sign>0?ea:-ea;});
   });
+  // If no groups, still count standalone extras
+  if(!groups.length){
+    extras.forEach(function(ex){var ea=Math.round(ex.amt);s+=ex.sign>0?ea:-ea;});
+  }
   return s;
 }
 
@@ -1563,7 +1575,7 @@ function rzCommit(){
   var pcEl=document.getElementById("rz-poolC");
   var pca=parseFloat(pcEl.value);var usePC=!isNaN(pca)&&pcEl.dataset.m==="1";
   var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
-  if(!lines.length){alert("Dodaj najpierw grupy go\u015Bci");return false;}
+  if(!lines.length){alert("Dodaj grupy gości lub inne pozycje");return false;}
   var data=rzLoad();
   var delta=rzCalcDelta(rzGroups,rzExtras,cleaning,ph,usePC,pca);
   data.saldo+=delta;
@@ -2044,11 +2056,15 @@ function kartyRender(){
   if(grid)grid.style.display="block";
   if(!list)return;
   list.innerHTML="";
+  var dragSrc=-1;
   cards.forEach(function(card,i){
     var el=document.createElement("div");
     el.style.cssText="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(201,169,110,.2);border-radius:20px;padding:16px 20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .15s;";
+    el.setAttribute("draggable","true");
+    el.dataset.idx=i;
     el.innerHTML=
-      '<div style="width:56px;height:56px;border-radius:12px;overflow:hidden;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
+      '<div class="karty-drag-handle" style="color:rgba(201,169,110,.5);font-size:20px;cursor:grab;padding:0 4px;flex-shrink:0;touch-action:none;user-select:none;">⠿</div>'
+      +'<div style="width:56px;height:56px;border-radius:12px;overflow:hidden;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
       +(card.img?'<img src="'+card.img+'" style="width:100%;height:100%;object-fit:contain;"/>':'<span style="font-size:28px;">💳</span>')
       +'</div>'
       +'<div style="flex:1;">'
@@ -2056,7 +2072,73 @@ function kartyRender(){
       +'<div style="font-size:12px;color:var(--text3);margin-top:2px;">Kliknij aby zobaczyć kod</div>'
       +'</div>'
       +'<div style="color:var(--gold2);font-size:20px;">›</div>';
-    el.onclick=function(){kartyDetail(i);};
+    // Click opens detail (not on handle)
+    el.addEventListener("click",function(e){
+      if(e.target.closest(".karty-drag-handle"))return;
+      kartyDetail(i);
+    });
+    // Desktop drag events
+    el.addEventListener("dragstart",function(e){
+      dragSrc=parseInt(this.dataset.idx);
+      this.style.opacity="0.5";
+      e.dataTransfer.effectAllowed="move";
+    });
+    el.addEventListener("dragend",function(){this.style.opacity="1";});
+    el.addEventListener("dragover",function(e){e.preventDefault();e.dataTransfer.dropEffect="move";this.style.borderColor="rgba(201,169,110,.7)";});
+    el.addEventListener("dragleave",function(){this.style.borderColor="rgba(201,169,110,.2)";});
+    el.addEventListener("drop",function(e){
+      e.preventDefault();
+      this.style.borderColor="rgba(201,169,110,.2)";
+      var dropIdx=parseInt(this.dataset.idx);
+      if(dragSrc===dropIdx)return;
+      var arr=kartyLoad();
+      var moved=arr.splice(dragSrc,1)[0];
+      arr.splice(dropIdx,0,moved);
+      kartySaveAll(arr);
+      kartyRender();
+    });
+    // Touch drag for mobile
+    (function(el,idx){
+      var startY,startX,clone,origRect;
+      el.querySelector(".karty-drag-handle").addEventListener("touchstart",function(e){
+        e.stopPropagation();
+        var touch=e.touches[0];
+        startY=touch.clientY;startX=touch.clientX;
+        origRect=el.getBoundingClientRect();
+        clone=el.cloneNode(true);
+        clone.style.cssText+=";position:fixed;width:"+origRect.width+"px;top:"+origRect.top+"px;left:"+origRect.left+"px;z-index:9999;opacity:0.85;pointer-events:none;";
+        document.body.appendChild(clone);
+        el.style.opacity="0.3";
+        e.preventDefault();
+      },{passive:false});
+      document.addEventListener("touchmove",function(e){
+        if(!clone)return;
+        var touch=e.touches[0];
+        var dy=touch.clientY-startY,dx=touch.clientX-startX;
+        clone.style.top=(origRect.top+dy)+"px";
+        clone.style.left=(origRect.left+dx)+"px";
+        e.preventDefault();
+      },{passive:false});
+      document.addEventListener("touchend",function(e){
+        if(!clone)return;
+        var touch=e.changedTouches[0];
+        clone.remove();clone=null;
+        el.style.opacity="1";
+        // Find which element we dropped on
+        var items=list.querySelectorAll("[data-idx]");
+        var dropIdx=idx;
+        items.forEach(function(item){
+          var r=item.getBoundingClientRect();
+          if(touch.clientY>=r.top&&touch.clientY<=r.bottom)dropIdx=parseInt(item.dataset.idx);
+        });
+        if(dropIdx===idx)return;
+        var arr=kartyLoad();
+        var moved=arr.splice(idx,1)[0];
+        arr.splice(dropIdx,0,moved);
+        kartySaveAll(arr);
+        kartyRender();
+      });
+    })(el,i);
     list.appendChild(el);
   });
 }
@@ -2068,7 +2150,10 @@ function kartyDetail(i){
   _kartyDetailIdx=i;
   document.getElementById("kartaDetailName").textContent=card.name;
   document.getElementById("kartaDetailSub").textContent="Rozciągnij palcami aby powiększyć kod";
-  document.getElementById("kartaDetailImg").src=card.img||"";
+  var imgBox=document.getElementById("kartaImgBox");
+  if(imgBox)imgBox.style.display="none";
+  var imgEl=document.getElementById("kartaDetailImg");
+  if(imgEl){imgEl.src="";if(card.img)imgEl.src=card.img;}
   document.getElementById("kartaDeleteBtn").onclick=function(){kartyDelete(i);};
   var ov=document.getElementById("overlayKarta");
   if(ov){ov.style.display="flex";}
@@ -2376,7 +2461,7 @@ function ocrImgSel(inp){
 async function ocrGo(){
   var st=document.getElementById('ocrSt');
   if(!_ocrImg){st.textContent='Wybierz screenshot';return;}
-  var key=localStorage.getItem('gemini_key')||'';
+  var key=localStorage.getItem('r1000_key')||'';
   if(!key){st.style.color='#ef4444';st.textContent='Brak klucza Gemini w Ustawieniach';return;}
   st.style.color='var(--gold2)';st.textContent='Analizuję...';
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
