@@ -1765,7 +1765,8 @@ function rezRender(){
     var adults=ev.adults||"?";
     var kids=ev.children||"0";
     var country=ev.country||"";
-    tb+='<tr style="background:'+bg+';" onclick="rezEdit('+i+')">'
+    var uid=ev.uid||ev.start||i;
+    tb+='<tr style="background:'+bg+';cursor:pointer;" onclick="rezEdit(\''+uid+'\',\''+encodeURIComponent(ev._name||name)+'\')">'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.start)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.end)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+(ev._name||name)+(name.indexOf('*')>=0&&!ev._name?' <span style="color:var(--gold2);font-size:11px;">✏️</span>':'')+'</td>'
@@ -1778,18 +1779,25 @@ function rezRender(){
   el.innerHTML=th+tb;
 }
 
-function rezEdit(i){
-  var ev=rezData[i];
-  var name=(ev.summary||"").replace(/\s*[-–].*$/,"").trim();
+function rezEdit(uid,encName){
+  // Znajdź rezerwację po uid (nie po indeksie — indeks może być inny w przefiltrowanej tablicy)
+  var evIdx=-1;
+  for(var i=0;i<rezData.length;i++){
+    if((rezData[i].uid||rezData[i].start||i)===uid||(rezData[i].uid||rezData[i].start)===uid){evIdx=i;break;}
+  }
+  if(evIdx<0)return;
+  var ev=rezData[evIdx];
+  var name=decodeURIComponent(encName||'');
+  if(!name)name=(ev.summary||"").replace(/\s*[-–].*$/,"").trim();
   var adults=prompt("Dorośli — "+name+":",ev.adults||"");
   if(adults===null)return;
   var kids=prompt("Dzieci:",ev.children||"0");
   if(kids===null)return;
   var country=prompt("Kraj:",ev.country||"");
   if(country===null)return;
-  rezData[i].adults=adults;
-  rezData[i].children=kids;
-  rezData[i].country=country;
+  rezData[evIdx].adults=adults;
+  rezData[evIdx].children=kids;
+  rezData[evIdx].country=country;
   localStorage.setItem("rez_cache",JSON.stringify(rezData));
   rezRender();
 }
@@ -2222,14 +2230,16 @@ function kartySave(){
   if(!_kartyAddImgData){alert("Dodaj zdjęcie kodu");return;}
   var cards=kartyLoad();
   cards.push({name:name,img:_kartyAddImgData,added:Date.now()});
-  // Zapisz do IDB i localStorage, potem odśwież listę
-  idbSave(cards,function(){
-    try{localStorage.setItem('loyalty_cards',JSON.stringify(cards));}catch(e){}
+  // Zapisz do IDB (bez limitu) i localStorage
+  var doneClose=false;
+  function finish(){
+    if(doneClose)return;doneClose=true;
     overlayKartyAddClose();
     kartyRender();
-  });
-  // Też od razu próbuj localStorage (sync fallback)
-  try{localStorage.setItem('loyalty_cards',JSON.stringify(cards));overlayKartyAddClose();kartyRender();}catch(e){}
+  }
+  idbSave(cards,finish);
+  // Też od razu sync do localStorage — jeśli zmieści, finish zawoła się szybciej
+  try{localStorage.setItem('loyalty_cards',JSON.stringify(cards));finish();}catch(e){}
 }
 
 // Patch showScreen for karty
@@ -2517,20 +2527,31 @@ async function ocrGo(){
     var p;
     try{p=JSON.parse(txt);}
     catch(pe){st.style.color='#ef4444';st.textContent='Błąd parsowania JSON: '+pe.message;return;}
+    // Znajdź pasującą rezerwację — szukaj po dacie check-in LUB check-out (tolerancja ±1 dzień) LUB po nazwisku
     var matched=false;
+    var pIn=p.checkin?new Date(p.checkin):null;
+    var pOut=p.checkout?new Date(p.checkout):null;
+    function dateDiff(a,b){return a&&b?Math.abs(new Date(a)-new Date(b))/(86400000):999;}
     for(var i=0;i<rezData.length;i++){
-      if((rezData[i].start||'').slice(0,10)===p.checkin||(rezData[i].end||'').slice(0,10)===p.checkout){
+      var ev=rezData[i];
+      var inMatch=pIn&&dateDiff(ev.start,p.checkin)<=1;
+      var outMatch=pOut&&dateDiff(ev.end,p.checkout)<=1;
+      var nameMatch=p.name&&ev.summary&&ev.summary.toLowerCase().indexOf(p.name.split(' ')[0].toLowerCase())>=0;
+      if(inMatch||outMatch||nameMatch){
         if(p.name)rezData[i]._name=p.name;
         if(p.adults)rezData[i].adults=p.adults;
-        if(p.children)rezData[i].children=p.children;
+        if(p.children!==undefined&&p.children!==null)rezData[i].children=p.children;
         if(p.country)rezData[i].country=p.country;
         matched=true;break;
       }
     }
-    if(!matched&&p.name)rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',summary:p.name,_name:p.name,adults:p.adults,children:p.children,country:p.country});
+    if(!matched&&p.name){
+      rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',summary:p.name,_name:p.name,adults:p.adults,children:p.children||'0',country:p.country||''});
+    }
+    if(!matched&&!p.name){st.style.color='#ef4444';st.textContent='Nie znaleziono rezerwacji do dopasowania';return;}
     localStorage.setItem('rez_cache',JSON.stringify(rezData));
-    st.style.color='#4ade80';st.textContent='✓ '+(p.name||'?')+' | dor:'+(p.adults||'?')+' dz:'+(p.children||'0');
-    setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
+    st.style.color='#4ade80';st.textContent='✓ '+(p.name||'?')+' | dor:'+(p.adults||'?')+' dz:'+(p.children||'0')+(matched?' — zaktualizowano':' — dodano nową');
+    setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},2000);
   }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
 // INIT
@@ -2538,6 +2559,54 @@ async function ocrGo(){
 document.getElementById("inpArr").value=todayStr();
 recalcDep();
 updateKeyStatus();
+
+// ================================================================
+// LOKALNE POWIADOMIENIA (bez serwera)
+// ================================================================
+// Harmonogram wywozu śmieci — daty tygodniowe (śr=3,sob=6 lub wg ustawień)
+// Sprawdzamy codziennie o 18:00 czy jutro jest wywóz
+(function(){
+  var WASTE_DAYS=[3,6]; // środa i sobota (0=niedziela)
+  var lastNotifDay='';
+
+  function checkLocalNotifs(){
+    if(!('Notification' in window)||Notification.permission!=='granted')return;
+    var now=new Date();
+    var todayKey=now.toDateString();
+    if(lastNotifDay===todayKey)return; // już sprawdzono dziś
+    var h=now.getHours();
+    if(h<18)return; // tylko po 18:00
+    lastNotifDay=todayKey;
+    // Jutrzejszy dzień tygodnia
+    var tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
+    var tomorrowDow=tomorrow.getDay();
+    if(WASTE_DAYS.indexOf(tomorrowDow)>=0){
+      var dayName=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'][tomorrowDow];
+      sendLocalNotif('🗑️ Wywóz śmieci jutro','Pamiętaj wystawić śmieci — '+dayName+' rano','waste');
+    }
+  }
+
+  function sendLocalNotif(title,body,tag){
+    if(!('serviceWorker' in navigator))return;
+    navigator.serviceWorker.ready.then(function(reg){
+      reg.showNotification(title,{
+        body:body,
+        tag:tag||'local',
+        icon:'./icon.png',
+        requireInteraction:false,
+        data:{url:'/'}
+      });
+    }).catch(function(){
+      // Fallback — zwykłe Notification API
+      try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
+    });
+  }
+
+  // Sprawdzaj co 5 minut
+  setInterval(checkLocalNotifs,5*60*1000);
+  // I od razu przy starcie (z opóźnieniem żeby SW zdążył się zarejestrować)
+  setTimeout(checkLocalNotifs,5000);
+})();
 </script>
   <script>
 if ('serviceWorker' in navigator) {
