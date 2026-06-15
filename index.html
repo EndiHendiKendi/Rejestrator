@@ -2042,6 +2042,42 @@ var _kartyDetailIdx=-1;
 function kartyLoad(){try{return JSON.parse(localStorage.getItem(KARTY_KEY)||"[]");}catch(e){return [];}}
 function kartySaveAll(arr){localStorage.setItem(KARTY_KEY,JSON.stringify(arr));}
 
+// Global drag state for karty (avoids listener accumulation on re-render)
+var _kartyDrag={active:false,idx:-1,clone:null,origRect:null,startY:0,startX:0,listRef:null};
+function _kartyDragCleanup(){
+  if(_kartyDrag.clone){_kartyDrag.clone.remove();_kartyDrag.clone=null;}
+  _kartyDrag.active=false;
+  if(_kartyDrag.listRef){
+    _kartyDrag.listRef.querySelectorAll("[data-idx]").forEach(function(el){el.style.opacity="1";});
+  }
+}
+document.addEventListener("touchmove",function(e){
+  if(!_kartyDrag.active||!_kartyDrag.clone)return;
+  var touch=e.touches[0];
+  _kartyDrag.clone.style.top=(_kartyDrag.origRect.top+(touch.clientY-_kartyDrag.startY))+"px";
+  _kartyDrag.clone.style.left=(_kartyDrag.origRect.left+(touch.clientX-_kartyDrag.startX))+"px";
+  e.preventDefault();
+},{passive:false});
+document.addEventListener("touchend",function(e){
+  if(!_kartyDrag.active)return;
+  var touch=e.changedTouches[0];
+  var fromIdx=_kartyDrag.idx;
+  var list=_kartyDrag.listRef;
+  _kartyDragCleanup();
+  if(!list)return;
+  var dropIdx=fromIdx;
+  list.querySelectorAll("[data-idx]").forEach(function(item){
+    var r=item.getBoundingClientRect();
+    if(touch.clientY>=r.top&&touch.clientY<=r.bottom)dropIdx=parseInt(item.dataset.idx);
+  });
+  if(dropIdx===fromIdx)return;
+  var arr=kartyLoad();
+  var moved=arr.splice(fromIdx,1)[0];
+  arr.splice(dropIdx,0,moved);
+  kartySaveAll(arr);
+  kartyRender();
+});
+
 function kartyRender(){
   var cards=kartyLoad();
   var empty=document.getElementById("kartyEmpty");
@@ -2056,6 +2092,7 @@ function kartyRender(){
   if(grid)grid.style.display="block";
   if(!list)return;
   list.innerHTML="";
+  _kartyDrag.listRef=list;
   var dragSrc=-1;
   cards.forEach(function(card,i){
     var el=document.createElement("div");
@@ -2083,62 +2120,38 @@ function kartyRender(){
       this.style.opacity="0.5";
       e.dataTransfer.effectAllowed="move";
     });
-    el.addEventListener("dragend",function(){this.style.opacity="1";});
+    el.addEventListener("dragend",function(){this.style.opacity="1";dragSrc=-1;});
     el.addEventListener("dragover",function(e){e.preventDefault();e.dataTransfer.dropEffect="move";this.style.borderColor="rgba(201,169,110,.7)";});
     el.addEventListener("dragleave",function(){this.style.borderColor="rgba(201,169,110,.2)";});
     el.addEventListener("drop",function(e){
       e.preventDefault();
       this.style.borderColor="rgba(201,169,110,.2)";
       var dropIdx=parseInt(this.dataset.idx);
-      if(dragSrc===dropIdx)return;
+      if(dragSrc<0||dragSrc===dropIdx)return;
       var arr=kartyLoad();
       var moved=arr.splice(dragSrc,1)[0];
       arr.splice(dropIdx,0,moved);
+      dragSrc=-1;
       kartySaveAll(arr);
       kartyRender();
     });
-    // Touch drag for mobile
-    (function(el,idx){
-      var startY,startX,clone,origRect;
-      el.querySelector(".karty-drag-handle").addEventListener("touchstart",function(e){
-        e.stopPropagation();
-        var touch=e.touches[0];
-        startY=touch.clientY;startX=touch.clientX;
-        origRect=el.getBoundingClientRect();
-        clone=el.cloneNode(true);
-        clone.style.cssText+=";position:fixed;width:"+origRect.width+"px;top:"+origRect.top+"px;left:"+origRect.left+"px;z-index:9999;opacity:0.85;pointer-events:none;";
-        document.body.appendChild(clone);
-        el.style.opacity="0.3";
-        e.preventDefault();
-      },{passive:false});
-      document.addEventListener("touchmove",function(e){
-        if(!clone)return;
-        var touch=e.touches[0];
-        var dy=touch.clientY-startY,dx=touch.clientX-startX;
-        clone.style.top=(origRect.top+dy)+"px";
-        clone.style.left=(origRect.left+dx)+"px";
-        e.preventDefault();
-      },{passive:false});
-      document.addEventListener("touchend",function(e){
-        if(!clone)return;
-        var touch=e.changedTouches[0];
-        clone.remove();clone=null;
-        el.style.opacity="1";
-        // Find which element we dropped on
-        var items=list.querySelectorAll("[data-idx]");
-        var dropIdx=idx;
-        items.forEach(function(item){
-          var r=item.getBoundingClientRect();
-          if(touch.clientY>=r.top&&touch.clientY<=r.bottom)dropIdx=parseInt(item.dataset.idx);
-        });
-        if(dropIdx===idx)return;
-        var arr=kartyLoad();
-        var moved=arr.splice(idx,1)[0];
-        arr.splice(dropIdx,0,moved);
-        kartySaveAll(arr);
-        kartyRender();
-      });
-    })(el,i);
+    // Touch drag — only touchstart here; move/end handled globally
+    el.querySelector(".karty-drag-handle").addEventListener("touchstart",function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      var touch=e.touches[0];
+      _kartyDrag.active=true;
+      _kartyDrag.idx=i;
+      _kartyDrag.startY=touch.clientY;
+      _kartyDrag.startX=touch.clientX;
+      _kartyDrag.origRect=el.getBoundingClientRect();
+      _kartyDrag.listRef=list;
+      var clone=el.cloneNode(true);
+      clone.style.cssText+=";position:fixed;width:"+_kartyDrag.origRect.width+"px;top:"+_kartyDrag.origRect.top+"px;left:"+_kartyDrag.origRect.left+"px;z-index:9999;opacity:0.85;pointer-events:none;";
+      document.body.appendChild(clone);
+      _kartyDrag.clone=clone;
+      el.style.opacity="0.3";
+    },{passive:false});
     list.appendChild(el);
   });
 }
@@ -2209,9 +2222,14 @@ function kartySave(){
   if(!_kartyAddImgData){alert("Dodaj zdjęcie kodu");return;}
   var cards=kartyLoad();
   cards.push({name:name,img:_kartyAddImgData,added:Date.now()});
-  kartySaveAll(cards);
-  overlayKartyAddClose();
-  kartyRender();
+  // Zapisz do IDB i localStorage, potem odśwież listę
+  idbSave(cards,function(){
+    try{localStorage.setItem('loyalty_cards',JSON.stringify(cards));}catch(e){}
+    overlayKartyAddClose();
+    kartyRender();
+  });
+  // Też od razu próbuj localStorage (sync fallback)
+  try{localStorage.setItem('loyalty_cards',JSON.stringify(cards));overlayKartyAddClose();kartyRender();}catch(e){}
 }
 
 // Patch showScreen for karty
@@ -2417,18 +2435,25 @@ function idbLoad(cb){
     req.onerror=function(){cb([]);};
   });
 }
-// Patch kartySaveAll i kartyLoad
+// Patch kartySaveAll i kartyLoad — localStorage primary, IDB backup dla dużych zdjęć
 var _origKartySaveAll=kartySaveAll;
 kartySaveAll=function(arr){
-  idbSave(arr);
-  try{_origKartySaveAll(arr);}catch(e){
-    var slim=arr.map(function(c){return{name:c.name,pos:c.pos,added:c.added};});
-    try{localStorage.setItem('loyalty_cards',JSON.stringify(slim));}catch(e2){}
-  }
+  // Zawsze próbuj localStorage z pełnymi danymi
+  var saved=false;
+  try{localStorage.setItem('loyalty_cards',JSON.stringify(arr));saved=true;}catch(e){}
+  // IDB zawsze — jako backup i dla dużych zdjęć
+  idbSave(arr,function(){
+    if(!saved){
+      // localStorage nie zmieściło — zapisz slim (bez img) żeby kolejność się zachowała
+      var slim=arr.map(function(c,i){return{name:c.name,pos:i,added:c.added||0};});
+      try{localStorage.setItem('loyalty_cards',JSON.stringify(slim));}catch(e2){}
+    }
+  });
 };
-// Przy starcie wczytaj z IDB i odśwież
+// Przy starcie wczytaj z IDB — ma pełne dane ze zdjęciami
 idbLoad(function(arr){
   if(arr&&arr.length>0){
+    // Nadpisz localStorage pełnymi danymi z IDB
     try{localStorage.setItem('loyalty_cards',JSON.stringify(arr));}catch(e){}
     if(typeof kartyRender==='function'){
       var cur=document.getElementById('s-karty');
@@ -2467,7 +2492,7 @@ async function ocrGo(){
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
   var prompt='Z tego screenshota wyciagnij dane rezerwacji. Odpowiedz TYLKO surowym JSON bez zadnych komentarzy ani backtickow: {"name":"imie nazwisko goscia","adults":"liczba doroslych","children":"liczba dzieci","country":"kraj goscia lub pusty string","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}';
   try{
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key,{
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key='+key,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],
