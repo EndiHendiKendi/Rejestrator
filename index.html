@@ -1607,12 +1607,12 @@ function rzFullText(){
 }
 
 document.getElementById("btnRzShare").addEventListener("click",function(){
-  if(rzGroups.length){if(!rzCommit())return;}
+  if(rzGroups.length||rzExtras.length){if(!rzCommit())return;}
   var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
   window.open("https://wa.me/?text="+encodeURIComponent(rzFullText()),"_blank");
 });
 document.getElementById("btnRzCopy").addEventListener("click",function(){
-  if(rzGroups.length)rzCommit();
+  if(rzGroups.length||rzExtras.length)rzCommit();
   var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
   var txt=rzFullText();
   var ok=document.getElementById("rz-copyOk");
@@ -2465,16 +2465,33 @@ async function ocrGo(){
   if(!key){st.style.color='#ef4444';st.textContent='Brak klucza Gemini w Ustawieniach';return;}
   st.style.color='var(--gold2)';st.textContent='Analizuję...';
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
-  var prompt='Z tego screenshota wyciągnij dane rezerwacji. Odpowiedz TYLKO jako JSON: {"name":"","adults":"","children":"","country":"","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}';
+  var prompt='Z tego screenshota wyciagnij dane rezerwacji. Odpowiedz TYLKO surowym JSON bez zadnych komentarzy ani backtickow: {"name":"imie nazwisko goscia","adults":"liczba doroslych","children":"liczba dzieci","country":"kraj goscia lub pusty string","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}';
   try{
     var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}]})
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],
+        generationConfig:{temperature:0,maxOutputTokens:512,responseMimeType:"application/json"}
+      })
     });
     var d=await resp.json();
-    var txt=((d.candidates||[])[0]||{}).content;
-    txt=txt?(txt.parts||[])[0].text||'':'';
-    var p=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    // Check for API error
+    if(d.error){st.style.color='#ef4444';st.textContent='Błąd API: '+(d.error.message||'nieznany');return;}
+    var candidate=(d.candidates||[])[0];
+    if(!candidate){st.style.color='#ef4444';st.textContent='Brak odpowiedzi od AI';return;}
+    // Handle finish reason
+    var reason=(candidate.finishReason||'').toUpperCase();
+    var rawContent=candidate.content;
+    var txt=rawContent?(rawContent.parts||[])[0]&&rawContent.parts[0].text||'':'';
+    // Strip markdown fences and whitespace
+    txt=txt.replace(/```json[\s\S]*?```|```[\s\S]*?```/g,function(m){return m.replace(/```json|```/g,'');}).trim();
+    // Try to extract JSON object if extra text present
+    var jsonMatch=txt.match(/\{[\s\S]*\}/);
+    if(jsonMatch)txt=jsonMatch[0];
+    if(!txt){st.style.color='#ef4444';st.textContent='AI nie zwróciło danych ('+reason+')';return;}
+    var p;
+    try{p=JSON.parse(txt);}
+    catch(pe){st.style.color='#ef4444';st.textContent='Błąd parsowania JSON: '+pe.message;return;}
     var matched=false;
     for(var i=0;i<rezData.length;i++){
       if((rezData[i].start||'').slice(0,10)===p.checkin||(rezData[i].end||'').slice(0,10)===p.checkout){
@@ -2487,7 +2504,7 @@ async function ocrGo(){
     }
     if(!matched&&p.name)rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',summary:p.name,_name:p.name,adults:p.adults,children:p.children,country:p.country});
     localStorage.setItem('rez_cache',JSON.stringify(rezData));
-    st.style.color='#4ade80';st.textContent='✓ '+( p.name||'?')+' | dor:'+( p.adults||'?')+' dz:'+(p.children||'0');
+    st.style.color='#4ade80';st.textContent='✓ '+(p.name||'?')+' | dor:'+(p.adults||'?')+' dz:'+(p.children||'0');
     setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
   }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
