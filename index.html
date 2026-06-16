@@ -1764,32 +1764,27 @@ function rezSync(){
 }
 
 function rezRender(){
-  // Zawsze synchronizuj rezData z localStorage — to jest źródło prawdy
+  // Zawsze czytaj świeżo z localStorage — to jest jedyne źródło prawdy
   try{
     var c=localStorage.getItem("rez_cache");
-    if(c){
-      var cached=JSON.parse(c);
-      // Merge: zachowaj _edited flagi z pamięci jeśli nowsze
-      var memByUid={};
-      rezData.forEach(function(ev){if(ev.uid&&ev._edited)memByUid[ev.uid]=ev;});
-      rezData=cached.map(function(ev){
-        return memByUid[ev.uid]||ev;
-      });
-    }
+    if(c) rezData=JSON.parse(c);
   }catch(e){}
-  // filter blocked slots
+
   var _today=new Date();_today.setHours(0,0,0,0);
-  var _rezFiltered=rezData.filter(function(ev){
+  var _rezFiltered=[];
+  var _rezFilteredIdx=[]; // oryginalne indeksy w rezData
+  var curYear=new Date().getFullYear();
+  for(var fi=0;fi<rezData.length;fi++){
+    var ev=rezData[fi];
     var s=(ev.summary||"").toLowerCase();
-    var notKeyword=s.indexOf("not available")<0&&s.indexOf("unavailable")<0
+    var ok=s.indexOf("not available")<0&&s.indexOf("unavailable")<0
       &&s.indexOf("blocked")<0&&s.indexOf("closed")<0
       &&s.indexOf("airbnb (not")<0&&s.indexOf("lodgify")<0;
-    // Pokaż wszystkie rezerwacje z bieżącego sezonu (rok bieżący lub następny)
     var endDate=new Date(ev.end);
-    var curYear=new Date().getFullYear();
-    var notTooOld=endDate.getFullYear()>=(curYear-1);
-    return notKeyword&&notTooOld;
-  });
+    var notOld=!isNaN(endDate)&&endDate.getFullYear()>=(curYear-1);
+    if(ok&&notOld){_rezFiltered.push(ev);_rezFilteredIdx.push(fi);}
+  }
+
   var empty=document.getElementById("rezEmpty");
   var wrap=document.getElementById("rezTableWrap");
   if(!_rezFiltered.length){
@@ -1799,30 +1794,28 @@ function rezRender(){
   }
   if(empty)empty.style.display="none";
   if(wrap)wrap.style.display="block";
-  if(!_rezFiltered.length){if(empty)empty.style.display="block";if(wrap)wrap.style.display="none";return;}
   var el=document.getElementById("rezTableEl");if(!el)return;
-  var th="<thead><tr style=\"background:rgba(201,169,110,.12);\">";
+  var th="<thead><tr style='background:rgba(201,169,110,.12);'>";
   ["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz."].forEach(function(col){
-    th+='<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:11px;'+'text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid rgba(201,169,110,.2);">'+col+'</th>';
+    th+='<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid rgba(201,169,110,.2);">'+col+'</th>';
   });
   th+="</tr></thead>";
   var tb="<tbody>";
   _rezFiltered.forEach(function(ev,i){
+    var realIdx=_rezFilteredIdx[i]; // indeks w rezData
     var bg=i%2===0?"rgba(255,255,255,.02)":"transparent";
     var rawName=(ev.summary||"N/A").replace(/\s*[-–].*$/,"").trim();
-    var hasCustomName=ev._name&&ev._name.indexOf('*')<0;
+    var hasCustomName=ev._name&&ev._name.indexOf('*')<0&&ev._name.trim().length>0;
     var displayName=hasCustomName?ev._name:rawName;
     var isCensored=displayName.indexOf('*')>=0;
     var nameHtml=hasCustomName
-      ?'<span style="color:#4ade80;">'+ev._name+'</span>'
-      :(isCensored
-        ?displayName+' <span style="color:var(--gold2);font-size:11px;" title="Kliknij aby uzupełnić">✏️</span>'
-        :displayName);
+      ?'<span style="color:#4ade80;">'+displayName+'</span>'
+      :(isCensored?displayName+' <span style="color:var(--gold2);font-size:11px;">✏️</span>':displayName);
     var adults=ev.adults||"?";
-    var kids=ev.children||"0";
+    var kids=(ev.children!=null&&ev.children!=='')?ev.children:"0";
     var country=ev.country||"";
-    var uid=ev.uid||ev.start||i;
-    tb+='<tr style="background:'+bg+';cursor:pointer;" onclick="rezEdit(\''+uid+'\',\''+encodeURIComponent(displayName)+'\')">'
+    // Używamy numerycznego indeksu w rezData — bezpieczne, bez problemów z uid
+    tb+='<tr style="background:'+bg+';cursor:pointer;" onclick="rezEdit('+realIdx+')">'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.start)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text2);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+fmtDate(ev.end)+'</td>'
       +'<td style="padding:9px 8px;color:var(--text);font-weight:600;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);">'+nameHtml+'</td>'
@@ -1835,37 +1828,25 @@ function rezRender(){
   el.innerHTML=th+tb;
 }
 
-function rezEdit(uid,encName){
-  var evIdx=-1;
-  for(var i=0;i<rezData.length;i++){
-    var testUid=rezData[i].uid||rezData[i].start||String(i);
-    if(testUid===uid){evIdx=i;break;}
-  }
-  if(evIdx<0){
-    // Spróbuj z cache
-    try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
-    for(var j=0;j<rezData.length;j++){
-      var testUid2=rezData[j].uid||rezData[j].start||String(j);
-      if(testUid2===uid){evIdx=j;break;}
-    }
-  }
-  if(evIdx<0)return;
-  var ev=rezData[evIdx];
+function rezEdit(realIdx){
+  // Zawsze czytaj świeżo z localStorage przed edycją
+  try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+  var ev=rezData[realIdx];
+  if(!ev)return;
   var curName=ev._name&&ev._name.indexOf('*')<0?ev._name:(ev.summary||'').replace(/\s*[-–].*$/,'').trim();
-  var newName=prompt("Imię i nazwisko (zostaw puste aby zachować):",curName);
+  var newName=prompt("Imię i nazwisko:",curName);
   if(newName===null)return;
-  var adults=prompt("Dorośli (zostaw puste aby zachować):",ev.adults||'');
+  var adults=prompt("Dorośli:",ev.adults||'');
   if(adults===null)return;
-  var kids=prompt("Dzieci (zostaw puste aby zachować):",ev.children||'0');
+  var kids=prompt("Dzieci:",ev.children||'0');
   if(kids===null)return;
-  var country=prompt("Kraj (zostaw puste aby zachować):",ev.country||'');
+  var country=prompt("Kraj:",ev.country||'');
   if(country===null)return;
-  // Zapisz tylko niepuste wartości
-  if(newName.trim())rezData[evIdx]._name=newName.trim();
-  if(adults.trim())rezData[evIdx].adults=adults.trim();
-  if(kids.trim())rezData[evIdx].children=kids.trim();
-  if(country.trim())rezData[evIdx].country=country.trim();
-  rezData[evIdx]._edited=true;
+  if(newName.trim())rezData[realIdx]._name=newName.trim();
+  if(adults.trim())rezData[realIdx].adults=adults.trim();
+  rezData[realIdx].children=kids.trim();
+  if(country.trim())rezData[realIdx].country=country.trim();
+  rezData[realIdx]._edited=true;
   localStorage.setItem("rez_cache",JSON.stringify(rezData));
   rezRender();
 }
@@ -2595,46 +2576,56 @@ async function ocrGo(){
     var p;
     try{p=JSON.parse(txt);}
     catch(pe){st.style.color='#ef4444';st.textContent='Błąd parsowania JSON: '+pe.message;return;}
-    // Upewnij się że rezData jest załadowane z cache przed szukaniem
+
+    // Zawsze przeładuj rezData z localStorage przed dopasowaniem
     try{var cc=localStorage.getItem("rez_cache");if(cc)rezData=JSON.parse(cc);}catch(e){}
-    // Znajdź pasującą rezerwację po datach (tolerancja ±2 dni na każdej dacie)
-    function dateStr(iso){return (iso||'').slice(0,10);}
-    function daysDiff(a,b){
-      var da=new Date(dateStr(a)),db=new Date(dateStr(b));
+
+    // Dopasuj po datach (tolerancja ±2 dni)
+    function daysDiff2(a,b){
+      var da=new Date((a||'').slice(0,10)),db=new Date((b||'').slice(0,10));
       return isNaN(da)||isNaN(db)?999:Math.abs(da-db)/86400000;
     }
-    var matched=false,matchIdx=-1;
+    var matchIdx=-1,bestScore=999;
     for(var i=0;i<rezData.length;i++){
       var ev=rezData[i];
-      var inOK=p.checkin&&daysDiff(ev.start,p.checkin)<=2;
-      var outOK=p.checkout&&daysDiff(ev.end,p.checkout)<=2;
-      if(inOK&&outOK){matchIdx=i;matched=true;break;}
-      if(inOK||outOK){matchIdx=i;} // słabsze dopasowanie — tylko jedna data
+      var dIn=p.checkin?daysDiff2(ev.start,p.checkin):999;
+      var dOut=p.checkout?daysDiff2(ev.end,p.checkout):999;
+      var score=dIn+dOut;
+      if(dIn<=2&&dOut<=2&&score<bestScore){bestScore=score;matchIdx=i;}
     }
-    if(!matched&&matchIdx>=0)matched=true; // akceptuj słabsze jeśli brak lepszego
-    if(matched&&matchIdx>=0){
-      // Zapisuj TYLKO pola które Gemini znalazł (nie nadpisuj pustymi wartościami)
+    // Słabsze dopasowanie — tylko jedna data
+    if(matchIdx<0){
+      for(var j=0;j<rezData.length;j++){
+        var ev2=rezData[j];
+        var dIn2=p.checkin?daysDiff2(ev2.start,p.checkin):999;
+        var dOut2=p.checkout?daysDiff2(ev2.end,p.checkout):999;
+        if(dIn2<=1||dOut2<=1){matchIdx=j;break;}
+      }
+    }
+
+    if(matchIdx>=0){
       if(p.name&&p.name.trim())rezData[matchIdx]._name=p.name.trim();
       if(p.adults&&String(p.adults).trim())rezData[matchIdx].adults=String(p.adults).trim();
       if(p.children!=null&&String(p.children).trim()!=='')rezData[matchIdx].children=String(p.children).trim();
       if(p.country&&p.country.trim())rezData[matchIdx].country=p.country.trim();
       rezData[matchIdx]._edited=true;
+      localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      st.style.color='#4ade80';
+      st.textContent='✓ '+(p.name||'?')+' | dor:'+(p.adults||'—')+' dz:'+(p.children!=null?p.children:'—')+' kraj:'+(p.country||'—')+' — zaktualizowano';
     } else if(p.name&&p.name.trim()){
-      // Brak dopasowania — dodaj nowy wpis
       rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',
         summary:p.name,_name:p.name.trim(),
         adults:p.adults?String(p.adults):'',
         children:p.children!=null?String(p.children):'0',
         country:p.country||'',_edited:true});
+      localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      st.style.color='#4ade80';
+      st.textContent='✓ '+p.name+' — dodano nową rezerwację';
     } else {
       st.style.color='#ef4444';
-      st.textContent='Nie dopasowano — sprawdź daty. Odczytano: '+(p.checkin||'?')+' → '+(p.checkout||'?');
+      st.textContent='Nie dopasowano. Odczytano daty: '+(p.checkin||'?')+' → '+(p.checkout||'?');
       return;
     }
-    localStorage.setItem('rez_cache',JSON.stringify(rezData));
-    var info=(p.name||'?')+' | dor:'+(p.adults||'—')+' dz:'+(p.children!=null?p.children:'—')+' kraj:'+(p.country||'—');
-    st.style.color='#4ade80';
-    st.textContent='✓ '+info+' — '+(matched?'zaktualizowano':'dodano nową');
     setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},2500);
   }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
