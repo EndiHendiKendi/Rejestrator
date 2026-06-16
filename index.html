@@ -1810,13 +1810,14 @@ function rezRender(){
   _rezFiltered.forEach(function(ev,i){
     var bg=i%2===0?"rgba(255,255,255,.02)":"transparent";
     var rawName=(ev.summary||"N/A").replace(/\s*[-–].*$/,"").trim();
-    var displayName=ev._name||rawName;
-    var isCensored=rawName.indexOf('*')>=0;
-    var nameHtml=ev._name
-      ?'<span style="color:#4ade80;">'+ev._name+'</span>'  // zielony = odcenzurowane
+    var hasCustomName=ev._name&&ev._name.indexOf('*')<0;
+    var displayName=hasCustomName?ev._name:rawName;
+    var isCensored=displayName.indexOf('*')>=0;
+    var nameHtml=hasCustomName
+      ?'<span style="color:#4ade80;">'+ev._name+'</span>'
       :(isCensored
-        ?rawName+' <span style="color:var(--gold2);font-size:11px;" title="Kliknij aby uzupełnić">✏️</span>'
-        :rawName);
+        ?displayName+' <span style="color:var(--gold2);font-size:11px;" title="Kliknij aby uzupełnić">✏️</span>'
+        :displayName);
     var adults=ev.adults||"?";
     var kids=ev.children||"0";
     var country=ev.country||"";
@@ -1837,24 +1838,34 @@ function rezRender(){
 function rezEdit(uid,encName){
   var evIdx=-1;
   for(var i=0;i<rezData.length;i++){
-    if((rezData[i].uid||rezData[i].start||i)===uid||(rezData[i].uid||rezData[i].start)===uid){evIdx=i;break;}
+    var testUid=rezData[i].uid||rezData[i].start||String(i);
+    if(testUid===uid){evIdx=i;break;}
+  }
+  if(evIdx<0){
+    // Spróbuj z cache
+    try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+    for(var j=0;j<rezData.length;j++){
+      var testUid2=rezData[j].uid||rezData[j].start||String(j);
+      if(testUid2===uid){evIdx=j;break;}
+    }
   }
   if(evIdx<0)return;
   var ev=rezData[evIdx];
-  var currentName=ev._name||(ev.summary||"").replace(/\s*[-–].*$/,"").trim();
-  var newName=prompt("Imię i nazwisko:",currentName);
+  var curName=ev._name&&ev._name.indexOf('*')<0?ev._name:(ev.summary||'').replace(/\s*[-–].*$/,'').trim();
+  var newName=prompt("Imię i nazwisko (zostaw puste aby zachować):",curName);
   if(newName===null)return;
-  var adults=prompt("Dorośli:",ev.adults||"");
+  var adults=prompt("Dorośli (zostaw puste aby zachować):",ev.adults||'');
   if(adults===null)return;
-  var kids=prompt("Dzieci:",ev.children||"0");
+  var kids=prompt("Dzieci (zostaw puste aby zachować):",ev.children||'0');
   if(kids===null)return;
-  var country=prompt("Kraj:",ev.country||"");
+  var country=prompt("Kraj (zostaw puste aby zachować):",ev.country||'');
   if(country===null)return;
+  // Zapisz tylko niepuste wartości
   if(newName.trim())rezData[evIdx]._name=newName.trim();
-  rezData[evIdx].adults=adults;
-  rezData[evIdx].children=kids;
-  rezData[evIdx].country=country;
-  rezData[evIdx]._edited=true; // flaga — Twoje dane mają priorytet
+  if(adults.trim())rezData[evIdx].adults=adults.trim();
+  if(kids.trim())rezData[evIdx].children=kids.trim();
+  if(country.trim())rezData[evIdx].country=country.trim();
+  rezData[evIdx]._edited=true;
   localStorage.setItem("rez_cache",JSON.stringify(rezData));
   rezRender();
 }
@@ -2585,36 +2596,46 @@ async function ocrGo(){
     try{p=JSON.parse(txt);}
     catch(pe){st.style.color='#ef4444';st.textContent='Błąd parsowania JSON: '+pe.message;return;}
     // Upewnij się że rezData jest załadowane z cache przed szukaniem
-    if(!rezData.length){
-      try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+    try{var cc=localStorage.getItem("rez_cache");if(cc)rezData=JSON.parse(cc);}catch(e){}
+    // Znajdź pasującą rezerwację po datach (tolerancja ±2 dni na każdej dacie)
+    function dateStr(iso){return (iso||'').slice(0,10);}
+    function daysDiff(a,b){
+      var da=new Date(dateStr(a)),db=new Date(dateStr(b));
+      return isNaN(da)||isNaN(db)?999:Math.abs(da-db)/86400000;
     }
-    // Znajdź pasującą rezerwację — priorytet: daty check-in i check-out (tolerancja ±1 dzień)
-    var matched=false;
-    var pIn=p.checkin?new Date(p.checkin):null;
-    var pOut=p.checkout?new Date(p.checkout):null;
-    function dateDiff(a,b){return a&&b?Math.abs(new Date(a)-new Date(b))/(86400000):999;}
+    var matched=false,matchIdx=-1;
     for(var i=0;i<rezData.length;i++){
       var ev=rezData[i];
-      var inMatch=pIn&&dateDiff(ev.start,p.checkin)<=1;
-      var outMatch=pOut&&dateDiff(ev.end,p.checkout)<=1;
-      // Muszą pasować OBIE daty albo jedna z tolerancją 0 (dokładnie)
-      var strongMatch=(inMatch&&outMatch)||(pIn&&dateDiff(ev.start,p.checkin)===0)||(pOut&&dateDiff(ev.end,p.checkout)===0);
-      if(strongMatch){
-        if(p.name)rezData[i]._name=p.name;
-        if(p.adults)rezData[i].adults=p.adults;
-        if(p.children!==undefined&&p.children!==null)rezData[i].children=p.children;
-        if(p.country)rezData[i].country=p.country;
-        rezData[i]._edited=true; // flaga — chroni przed nadpisaniem przy syncronizacji
-        matched=true;break;
-      }
+      var inOK=p.checkin&&daysDiff(ev.start,p.checkin)<=2;
+      var outOK=p.checkout&&daysDiff(ev.end,p.checkout)<=2;
+      if(inOK&&outOK){matchIdx=i;matched=true;break;}
+      if(inOK||outOK){matchIdx=i;} // słabsze dopasowanie — tylko jedna data
     }
-    if(!matched&&p.name){
-      rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',summary:p.name,_name:p.name,adults:p.adults||'',children:p.children||'0',country:p.country||'',_edited:true});
+    if(!matched&&matchIdx>=0)matched=true; // akceptuj słabsze jeśli brak lepszego
+    if(matched&&matchIdx>=0){
+      // Zapisuj TYLKO pola które Gemini znalazł (nie nadpisuj pustymi wartościami)
+      if(p.name&&p.name.trim())rezData[matchIdx]._name=p.name.trim();
+      if(p.adults&&String(p.adults).trim())rezData[matchIdx].adults=String(p.adults).trim();
+      if(p.children!=null&&String(p.children).trim()!=='')rezData[matchIdx].children=String(p.children).trim();
+      if(p.country&&p.country.trim())rezData[matchIdx].country=p.country.trim();
+      rezData[matchIdx]._edited=true;
+    } else if(p.name&&p.name.trim()){
+      // Brak dopasowania — dodaj nowy wpis
+      rezData.push({uid:'ocr_'+Date.now(),start:p.checkin||'',end:p.checkout||'',
+        summary:p.name,_name:p.name.trim(),
+        adults:p.adults?String(p.adults):'',
+        children:p.children!=null?String(p.children):'0',
+        country:p.country||'',_edited:true});
+    } else {
+      st.style.color='#ef4444';
+      st.textContent='Nie dopasowano — sprawdź daty. Odczytano: '+(p.checkin||'?')+' → '+(p.checkout||'?');
+      return;
     }
-    if(!matched&&!p.name){st.style.color='#ef4444';st.textContent='Nie znaleziono rezerwacji — sprawdź daty na screenie';return;}
     localStorage.setItem('rez_cache',JSON.stringify(rezData));
-    st.style.color='#4ade80';st.textContent='✓ '+(p.name||'?')+' | dor:'+(p.adults||'?')+' dz:'+(p.children||'0')+(matched?' — zaktualizowano':' — dodano nową');
-    setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},2000);
+    var info=(p.name||'?')+' | dor:'+(p.adults||'—')+' dz:'+(p.children!=null?p.children:'—')+' kraj:'+(p.country||'—');
+    st.style.color='#4ade80';
+    st.textContent='✓ '+info+' — '+(matched?'zaktualizowano':'dodano nową');
+    setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},2500);
   }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
 // INIT
