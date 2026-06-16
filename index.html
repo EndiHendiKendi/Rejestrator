@@ -1764,9 +1764,19 @@ function rezSync(){
 }
 
 function rezRender(){
-  if(!rezData.length){
-    try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
-  }
+  // Zawsze synchronizuj rezData z localStorage — to jest źródło prawdy
+  try{
+    var c=localStorage.getItem("rez_cache");
+    if(c){
+      var cached=JSON.parse(c);
+      // Merge: zachowaj _edited flagi z pamięci jeśli nowsze
+      var memByUid={};
+      rezData.forEach(function(ev){if(ev.uid&&ev._edited)memByUid[ev.uid]=ev;});
+      rezData=cached.map(function(ev){
+        return memByUid[ev.uid]||ev;
+      });
+    }
+  }catch(e){}
   // filter blocked slots
   var _today=new Date();_today.setHours(0,0,0,0);
   var _rezFiltered=rezData.filter(function(ev){
@@ -2574,6 +2584,10 @@ async function ocrGo(){
     var p;
     try{p=JSON.parse(txt);}
     catch(pe){st.style.color='#ef4444';st.textContent='Błąd parsowania JSON: '+pe.message;return;}
+    // Upewnij się że rezData jest załadowane z cache przed szukaniem
+    if(!rezData.length){
+      try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+    }
     // Znajdź pasującą rezerwację — priorytet: daty check-in i check-out (tolerancja ±1 dzień)
     var matched=false;
     var pIn=p.checkin?new Date(p.checkin):null;
