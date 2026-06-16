@@ -10,6 +10,8 @@ const ICONS = {
   licznik:        '💧',
   new_booking:    '📅',
   podatek:        '📋',
+  imu:            '🏠',
+  waste:          '🗑️',
 };
 
 self.addEventListener('push', e => {

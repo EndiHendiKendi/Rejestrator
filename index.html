@@ -1781,7 +1781,7 @@ function rezRender(){
       &&s.indexOf("blocked")<0&&s.indexOf("closed")<0
       &&s.indexOf("airbnb (not")<0&&s.indexOf("lodgify")<0;
     var endDate=new Date(ev.end);
-    var notOld=!isNaN(endDate)&&endDate.getFullYear()>=(curYear-1);
+    var notOld=!isNaN(endDate)&&endDate>=_today;
     if(ok&&notOld){_rezFiltered.push(ev);_rezFilteredIdx.push(fi);}
   }
 
@@ -2587,7 +2587,7 @@ async function ocrGo(){
       var s=(ev.summary||'').toLowerCase();
       var skip=s.indexOf('not available')>=0||s.indexOf('blocked')>=0||s.indexOf('lodgify')>=0;
       var endDate=new Date(ev.end);
-      if(!skip&&!isNaN(endDate)&&endDate.getFullYear()>=(curYear-1)){
+      if(!skip&&!isNaN(endDate)&&endDate>=new Date()){
         var label=(ev.start||'').slice(0,10)+' → '+(ev.end||'').slice(0,10)+' | '+(ev._name||(ev.summary||'').replace(/\s*[-–].*$/,'').trim());
         choices.push({idx:i,label:label});
       }
@@ -2597,14 +2597,39 @@ async function ocrGo(){
       st.style.color='#ef4444';st.textContent='Brak rezerwacji — zrób najpierw sync (przycisk 🔄)';return;
     }
 
+
     // Pokaż wybór — alert + prompt z numerem
-    var choiceText=found+'\n\nKtórą rezerwację zaktualizować? Wpisz numer:\n';
+    // Opcja 0 = nowa rezerwacja, zawsze dostępna
+    var choiceText=found+'\n\nKtórą rezerwację zaktualizować? Wpisz numer:\n0. ➕ NOWA rezerwacja (dodaj)\n';
     choices.forEach(function(c,i){choiceText+=(i+1)+'. '+c.label+'\n';});
-    var ans=prompt(choiceText,'1');
-    if(!ans)return;
-    var num=parseInt(ans)-1;
-    if(isNaN(num)||num<0||num>=choices.length){st.style.color='#ef4444';st.textContent='Nieprawidłowy numer';return;}
-    var realIdx=choices[num].idx;
+    var ans=prompt(choiceText,'');
+    if(ans===null||ans.trim()==='')return;
+    var num=parseInt(ans);
+
+    if(num===0){
+      // Nowa rezerwacja z danych AI
+      var newEv={
+        uid:'manual_'+Date.now(),
+        summary:p.name||'Gość',
+        start:p.checkin||'',
+        end:p.checkout||'',
+        _name:p.name||'',
+        adults:String(p.adults||''),
+        children:String(p.children||'0'),
+        country:p.country||'',
+        _edited:true
+      };
+      rezData.push(newEv);
+      localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      st.style.color='#4ade80';
+      st.textContent='✓ Dodano nową: '+(p.name||'?');
+      setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
+      return;
+    }
+
+    var idx=num-1;
+    if(isNaN(idx)||idx<0||idx>=choices.length){st.style.color='#ef4444';st.textContent='Nieprawidłowy numer';return;}
+    var realIdx=choices[idx].idx;
 
     // Zapisz dane
     if(p.name&&p.name.trim())rezData[realIdx]._name=p.name.trim();
@@ -2627,10 +2652,20 @@ updateKeyStatus();
 // ================================================================
 // LOKALNE POWIADOMIENIA (bez serwera)
 // ================================================================
-// Harmonogram wywozu śmieci — daty tygodniowe (śr=3,sob=6 lub wg ustawień)
+// Harmonogram wywozu śmieci — powiadomienia lokalne (bez serwera)
 // Sprawdzamy codziennie o 18:00 czy jutro jest wywóz
 (function(){
-  var WASTE_DAYS=[3,6]; // środa i sobota (0=niedziela)
+  // Mapowanie: dzień tygodnia → konkretna treść powiadomienia
+  var WASTE_SCHEDULE={
+    1:{title:'🗑️ Wystaw Niesegregowane!',body:'Jutro rano wywóz. Wystaw dziś wieczorem.'},        // pon
+    2:{title:'♻️ Wystaw Ekologiczne!',body:'Jutro rano wywóz. Wystaw dziś wieczorem.'},            // wt
+    3:{title:'📄 Wystaw Papier!',body:'Jutro rano wywóz. Wystaw dziś wieczorem.'},                  // śr
+    5:{title:'🟡 Wystaw Plastiki & Metale!',body:'Jutro rano wywóz. Wystaw dziś wieczorem.'},      // pt
+    0:{title:'🔴 Wystaw Niesegregowane!',body:'Jutro poniedziałek — wywóz rano.'},                  // nd→pon
+  };
+  // Szkło: 1. i 3. czwartek miesiąca
+  function isGlassWeek(d){var w=Math.ceil(d.getDate()/7);return w===1||w===3;}
+
   var lastNotifDay='';
 
   function checkLocalNotifs(){
@@ -2641,34 +2676,43 @@ updateKeyStatus();
     var h=now.getHours();
     if(h<18)return; // tylko po 18:00
     lastNotifDay=todayKey;
-    // Jutrzejszy dzień tygodnia
+
     var tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
-    var tomorrowDow=tomorrow.getDay();
-    if(WASTE_DAYS.indexOf(tomorrowDow)>=0){
-      var dayName=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'][tomorrowDow];
-      sendLocalNotif('🗑️ Wywóz śmieci jutro','Pamiętaj wystawić śmieci — '+dayName+' rano','waste');
+    var dow=tomorrow.getDay(); // jutrzejszy dzień tygodnia
+
+    var notif=null;
+    if(dow===4&&isGlassWeek(tomorrow)){
+      notif={title:'🟢 Wystaw Szkło!',body:'Jutro rano wywóz (1. lub 3. czwartek). Wystaw dziś.'};
+    } else if(WASTE_SCHEDULE[dow]){
+      notif=WASTE_SCHEDULE[dow];
     }
+
+    if(notif) sendLocalNotif(notif.title,notif.body,'waste_'+todayKey);
   }
 
   function sendLocalNotif(title,body,tag){
-    if(!('serviceWorker' in navigator))return;
-    navigator.serviceWorker.ready.then(function(reg){
-      reg.showNotification(title,{
-        body:body,
-        tag:tag||'local',
-        icon:'./icon.png',
-        requireInteraction:false,
-        data:{url:'/'}
+    // Priorytet: Service Worker showNotification — działa nawet gdy apka zamknięta
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.ready.then(function(reg){
+        reg.showNotification(title,{
+          body:body,
+          tag:tag||'local',
+          icon:'./icon.png',
+          badge:'./icon.png',
+          requireInteraction:true,
+          vibrate:[200,100,200],
+          data:{url:'/'}
+        });
+      }).catch(function(){
+        try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
       });
-    }).catch(function(){
-      // Fallback — zwykłe Notification API
+    } else {
       try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
-    });
+    }
   }
 
   // Sprawdzaj co 5 minut
   setInterval(checkLocalNotifs,5*60*1000);
-  // I od razu przy starcie (z opóźnieniem żeby SW zdążył się zarejestrować)
   setTimeout(checkLocalNotifs,5000);
 })();
 </script>
