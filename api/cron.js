@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
     // Monthly water meter — 25th at 09:00
     const d = new Date();
-    if (d.getDate()===25 && d.getHours()>=9 && d.getHours()<10) {
+    if (d.getDate()===25) {
       const mk = `meter_${d.getFullYear()}_${d.getMonth()}`;
       if (!await kv.get(mk)) {
         await sendPush(sub, {type:'licznik',title:'\uD83D\uDCA7 Licznik wody',body:'Odczytaj licznik wody \u2014 25. dzie\u0144 miesi\u0105ca.'}).catch(()=>{});
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     }
 
     // Tax — 15 May at 09:00
-    if (d.getMonth()===4 && d.getDate()===15 && d.getHours()>=9 && d.getHours()<10) {
+    if (d.getMonth()===4 && d.getDate()===15) {
       const tk = `tax_${d.getFullYear()}`;
       if (!await kv.get(tk)) {
         await sendPush(sub, {type:'podatek',title:'\uD83D\uDCCB Zeznanie podatkowe',body:'Zeznanie podatkowe \u2014 pliki CU'}).catch(()=>{});
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
 
     // Vacation mode — waste reminders at 18:00
     const vacMode = await kv.get('vac_mode');
-    if (vacMode==='1' && d.getHours()>=18 && d.getHours()<19) {
+    if (vacMode==='1') {
       const day = d.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
       const wk = `waste_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
       if (!await kv.get(wk)) {
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
 
     
     // IMU — 1 czerwca (rata 1)
-    if (d.getMonth()===5 && d.getDate()===1 && d.getHours()>=9 && d.getHours()<10) {
+    if (d.getMonth()===5 && d.getDate()===1) {
       const imu1k = `imu1_${d.getFullYear()}`;
       if (!await kv.get(imu1k)) {
         await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'}).catch(()=>{});
@@ -99,7 +99,7 @@ export default async function handler(req, res) {
       }
     }
     // IMU — 1 grudnia (rata 2)
-    if (d.getMonth()===11 && d.getDate()===1 && d.getHours()>=9 && d.getHours()<10) {
+    if (d.getMonth()===11 && d.getDate()===1) {
       const imu2k = `imu2_${d.getFullYear()}`;
       if (!await kv.get(imu2k)) {
         await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'}).catch(()=>{});
