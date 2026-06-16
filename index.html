@@ -1774,8 +1774,11 @@ function rezRender(){
     var notKeyword=s.indexOf("not available")<0&&s.indexOf("unavailable")<0
       &&s.indexOf("blocked")<0&&s.indexOf("closed")<0
       &&s.indexOf("airbnb (not")<0&&s.indexOf("lodgify")<0;
-    var notPast=new Date(ev.end)>=_today;
-    return notKeyword&&notPast;
+    // Pokaż wszystkie rezerwacje z bieżącego sezonu (rok bieżący lub następny)
+    var endDate=new Date(ev.end);
+    var curYear=new Date().getFullYear();
+    var notTooOld=endDate.getFullYear()>=(curYear-1);
+    return notKeyword&&notTooOld;
   });
   var empty=document.getElementById("rezEmpty");
   var wrap=document.getElementById("rezTableWrap");
