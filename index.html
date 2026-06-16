@@ -2549,12 +2549,12 @@ async function ocrGo(){
   if(!key){st.style.color='#ef4444';st.textContent='Brak klucza Gemini w Ustawieniach';return;}
   st.style.color='var(--gold2)';st.textContent='Analizuję...';
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
-  var prompt='Przeanalizuj ten screenshot z aplikacji rezerwacyjnej (Airbnb/Booking/Lodgify). Wyciagnij dane i odpowiedz TYLKO surowym JSON (bez backtickow, bez komentarzy):\n{"name":"pelne imie i nazwisko goscia","adults":"liczba doroslych jako cyfra","children":"liczba dzieci jako cyfra lub 0","country":"kraj goscia jesli widoczny lub pusty string","checkin":"data zameldowania YYYY-MM-DD","checkout":"data wymeldowania YYYY-MM-DD"}\nJesli jakiegos pola nie ma na screenie, wstaw pusty string dla tekstowych lub 0 dla liczb.';
+  var aiScanPrompt='Przeanalizuj ten screenshot z aplikacji rezerwacyjnej (Airbnb/Booking/Lodgify). Wyciagnij dane i odpowiedz TYLKO surowym JSON (bez backtickow, bez komentarzy):\n{"name":"pelne imie i nazwisko goscia","adults":"liczba doroslych jako cyfra","children":"liczba dzieci jako cyfra lub 0","country":"kraj goscia jesli widoczny lub pusty string","checkin":"data zameldowania YYYY-MM-DD","checkout":"data wymeldowania YYYY-MM-DD"}\nJesli jakiegos pola nie ma na screenie, wstaw pusty string dla tekstowych lub 0 dla liczb.';
   try{
     var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key='+key,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],
+        contents:[{parts:[{text:aiScanPrompt},{inline_data:{mime_type:mime,data:b64}}]}],
         generationConfig:{temperature:0,maxOutputTokens:256}
       })
     });
