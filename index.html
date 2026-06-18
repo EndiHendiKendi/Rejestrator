@@ -1707,6 +1707,7 @@ async function icalSyncWithFeedback(){
   }
 }
 
+async function pushSubscribe(){
   var ps=document.getElementById("pushStatus");
   function setStatus(msg,ok){
     if(ps){ps.textContent=msg;ps.style.color=ok?"#4ade80":"#ef4444";}
