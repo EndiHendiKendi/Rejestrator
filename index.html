@@ -1743,7 +1743,7 @@ var rezData=[];
 
 function fmtDate(iso){
   var d=new Date(iso);
-  return String(d.getDate()).padStart(2,"0")+" "+MONTHS_PL[d.getMonth()];
+  return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
 }
 
 function rezSync(){
@@ -2104,43 +2104,46 @@ function vacModeChanged(on){
   var sl=document.getElementById("vacModeSlider");
   if(sl)sl.style.background=on?"#38bdf8":"#2a2a3a";
   var st=document.getElementById("vacModeStatus");
-  if(st){st.style.display=on?"block":"none";st.textContent=on?"✓ Aktywny — powiadomienia włączone":"";}  
+  if(st){st.style.display=on?"block":"none";st.textContent=on?"✓ Aktywny — powiadomienia o śmieciach włączone":"";}
   var server=getServer();
   if(server)fetch(server+"/api/vac-mode",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:on})}).catch(function(){});
+  // Powiadom Service Worker o zmianie trybu wakacyjnego
+  if(navigator.serviceWorker&&navigator.serviceWorker.controller){
+    navigator.serviceWorker.controller.postMessage({type:"VAC_MODE_UPDATE",active:on});
+  }
+  // Zapisz też do caches dla SW (fallback gdy apka zamknięta)
+  if(window.caches){
+    caches.open("vac-mode-v1").then(function(cache){
+      cache.put("/vac-mode",new Response(on?"1":"0"));
+    }).catch(function(){});
+  }
 }
 function showWasteSchedule(){
   var ov=document.getElementById("overlayWaste");
   if(ov){ov.style.display="flex";}
 }
-(function(){
-  var on=localStorage.getItem("vac_mode")==="1";
-  var tog=document.getElementById("vacModeToggle");if(tog)tog.checked=on;
-  var sl=document.getElementById("vacModeSlider");if(sl)sl.style.background=on?"#38bdf8":"#2a2a3a";
-  var st=document.getElementById("vacModeStatus");if(st&&on){st.style.display="block";st.textContent="✓ Aktywny — powiadomienia włączone";}
-})();
-
-
-// ================================================================
-// TRYB WAKACYJNY
-// ================================================================
-function vacModeChanged(on){
-  localStorage.setItem("vac_mode",on?"1":"0");
-  var sl=document.getElementById("vacModeSlider");
-  if(sl)sl.style.background=on?"#38bdf8":"#2a2a3a";
-  var st=document.getElementById("vacModeStatus");
-  if(st){st.style.display=on?"block":"none";st.textContent=on?"✓ Aktywny — powiadomienia włączone":"";}  
-  var server=getServer();
-  if(server)fetch(server+"/api/vac-mode",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:on})}).catch(function(){});
-}
-function showWasteSchedule(){
-  var ov=document.getElementById("overlayWaste");
-  if(ov){ov.style.display="flex";ov.style.alignItems="flex-end";}
+// Odpowiedź na zapytanie SW o vac_mode
+if(navigator.serviceWorker){
+  navigator.serviceWorker.addEventListener("message",function(e){
+    if(e.data&&e.data.type==="GET_VAC_MODE"&&e.ports&&e.ports[0]){
+      e.ports[0].postMessage(localStorage.getItem("vac_mode")==="1");
+    }
+    // SW mówi żeby otworzyć harmonogram śmieci (po kliknięciu powiadomienia)
+    if(e.data&&e.data.type==="OPEN_TAB"&&e.data.tab){
+      if(e.data.tab==="harmonogram"){
+        // Pokaż overlay harmonogramu śmieci
+        setTimeout(function(){showWasteSchedule();},300);
+      } else {
+        showScreen(e.data.tab);
+      }
+    }
+  });
 }
 (function(){
   var on=localStorage.getItem("vac_mode")==="1";
   var tog=document.getElementById("vacModeToggle");if(tog)tog.checked=on;
   var sl=document.getElementById("vacModeSlider");if(sl)sl.style.background=on?"#38bdf8":"#2a2a3a";
-  var st=document.getElementById("vacModeStatus");if(st&&on){st.style.display="block";st.textContent="✓ Aktywny — powiadomienia włączone";}
+  var st=document.getElementById("vacModeStatus");if(st&&on){st.style.display="block";st.textContent="✓ Aktywny — powiadomienia o śmieciach włączone";}
 })();
 
 // ================================================================
@@ -2781,14 +2784,15 @@ updateKeyStatus();
 // LOKALNE POWIADOMIENIA (bez serwera)
 // ================================================================
 // Harmonogram wywozu śmieci — powiadomienia lokalne (bez serwera)
-// Sprawdzamy codziennie o 18:00 czy jutro jest wywóz
+// Wysyłamy o 18:00 dzień PRZED wywozem, TYLKO gdy tryb wakacyjny aktywny
 (function(){
   var WASTE_SCHEDULE={
-    1:{color:'🔴',name:'Niesegregowane'},
-    2:{color:'♻️',name:'Ekologiczne'},
-    3:{color:'📄',name:'Papier'},
-    5:{color:'🟡',name:'Plastik i Metale'},
-    0:{color:'🔴',name:'Niesegregowane'},
+    1:{color:'🔴',name:'Niesegregowane'},   // pon
+    2:{color:'♻️',name:'Ekologiczne'},       // wt
+    3:{color:'📄',name:'Papier'},            // śr
+    // czw = szkło (1+3 tydzień) — obsługiwane osobno
+    5:{color:'♻️',name:'Ekologiczne'},       // pt
+    6:{color:'🟡',name:'Plastik i Metale'},  // sob
   };
   var DAY_NAMES=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
   function isGlassWeek(d){var w=Math.ceil(d.getDate()/7);return w===1||w===3;}
@@ -2796,12 +2800,14 @@ updateKeyStatus();
   var lastNotifDay='';
 
   function checkLocalNotifs(){
+    // Tylko gdy tryb wakacyjny aktywny
+    if(localStorage.getItem('vac_mode')!=='1')return;
     if(!('Notification' in window)||Notification.permission!=='granted')return;
     var now=new Date();
     var todayKey=now.toDateString();
     if(lastNotifDay===todayKey)return;
     var h=now.getHours();
-    if(h<18)return;
+    if(h!==18)return; // dokładnie o 18:xx
     lastNotifDay=todayKey;
 
     var tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
@@ -2815,8 +2821,8 @@ updateKeyStatus();
     }
 
     if(notif){
-      var title=notif.color+' ŚMIECI';
-      var body='Jutro wywóz: '+notif.name+' ('+DAY_NAMES[dow]+')';
+      var title=notif.color+' Jutro wywóz śmieci';
+      var body=notif.name+' — wystaw dziś wieczór (jutro: '+DAY_NAMES[dow]+')';
       sendLocalNotif(title,body,'waste_'+todayKey);
     }
   }
@@ -2831,7 +2837,7 @@ updateKeyStatus();
           badge:'./icon.png',
           requireInteraction:true,
           vibrate:[200,100,200],
-          data:{url:'/'}
+          data:{url:'/?tab=harmonogram', type:'waste'}
         });
       }).catch(function(){
         try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
@@ -2841,7 +2847,7 @@ updateKeyStatus();
     }
   }
 
-  setInterval(checkLocalNotifs,5*60*1000);
+  setInterval(checkLocalNotifs,60*1000); // sprawdzaj co minutę
   setTimeout(checkLocalNotifs,5000);
 })();
 </script>
