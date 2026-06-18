@@ -540,7 +540,7 @@ select.inp{cursor:pointer;}
 <div class="screen" id="s-rezerwacje">
   <div class="topbar">
     <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Sezon 2026</div></div>
-    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls" style="display:none;" onchange="rezImportCsv(this)"/><button onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
+    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
   </div>
   <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
@@ -752,9 +752,29 @@ var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 // ═══════════════════════════════════════
 var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje","karty"];
 // Historia nawigacji — przycisk wstecz nie wyrzuca z apki
+// Overlay IDs które mogą być otwarte i powinny być zamknięte przez "wstecz"
+var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun"];
+function closeTopOverlay(){
+  // Zamknij pierwszy widoczny overlay od góry (najwyższy z-index ostatni w liście)
+  for(var _oi=OVERLAY_IDS.length-1;_oi>=0;_oi--){
+    var _oel=document.getElementById(OVERLAY_IDS[_oi]);
+    if(_oel&&_oel.style.display!=="none"&&_oel.style.display!==""){
+      _oel.style.display="none";
+      return true;
+    }
+  }
+  return false;
+}
 (function(){
   history.replaceState({screen:"lista"},"","");
   window.addEventListener("popstate",function(e){
+    // Najpierw sprawdź czy jest otwarty overlay
+    if(closeTopOverlay()){
+      // Przywróć stronę w historii (nie chcemy faktycznie cofać)
+      var cur=(e.state&&e.state.screen)||"lista";
+      history.pushState({screen:cur},"","");
+      return;
+    }
     var prev=(e.state&&e.state.screen)||"lista";
     showScreen(prev,true); // true = nie pushuj do historii (już robimy popstate)
     history.pushState({screen:prev},"","");
@@ -1563,25 +1583,34 @@ function rzRefreshHistory(){
   header.style.cssText="font-weight:700;color:var(--gold2);margin-bottom:10px;font-size:13px;";
   header.textContent="*Rozliczenie "+year+":*";
   hist.appendChild(header);
+  function isInneOnly(entry){
+    var ll=entry.lines;
+    return ll.length>0&&ll[0].indexOf("*Inne*")>=0&&
+      !ll.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
+  }
   data.entries.forEach(function(e,i){
     var block=document.createElement("div");
-    block.style.cssText="margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;position:relative;";
+    var linesCopy=e.lines.slice();
+    var thisInne=isInneOnly(e);
+    var prevInne=i>0&&isInneOnly(data.entries[i-1]);
+    var nextInne=i<data.entries.length-1&&isInneOnly(data.entries[i+1]);
+
+    if(thisInne&&prevInne){
+      // Kontynuacja bloku Inne — usuń nagłówek, połącz wizualnie z poprzednim (brak margin-top)
+      linesCopy=linesCopy.filter(function(l){return l.indexOf("*Inne*")<0;});
+      block.style.cssText="margin-bottom:12px;margin-top:-10px;padding:0 12px 10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 10px 10px;position:relative;";
+    } else if(thisInne&&nextInne){
+      // Pierwszy blok Inne gdy następny też Inne — brak dolnego border-radius
+      block.style.cssText="margin-bottom:0;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-bottom:none;border-radius:10px 10px 0 0;position:relative;";
+    } else {
+      block.style.cssText="margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;position:relative;";
+    }
+
     var txt=document.createElement("div");
     txt.style.cssText="font-family:'SF Mono',monospace;font-size:12px;line-height:1.8;color:var(--text2);white-space:pre-wrap;padding-right:30px;";
-    // Jeśli ten i poprzedni wpis to tylko "Inne" — pomijamy nagłówek "Inne" tutaj
-    var linesCopy=e.lines.slice();
-    var isOnlyInne=linesCopy.length>0&&linesCopy[0].indexOf("*Inne*")>=0&&
-      !linesCopy.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
-    var prevIsOnlyInne=i>0&&(function(){
-      var pl=data.entries[i-1].lines;
-      return pl.length>0&&pl[0].indexOf("*Inne*")>=0&&
-        !pl.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
-    })();
-    if(isOnlyInne&&prevIsOnlyInne){
-      // Usuń nagłówek "Inne" — kontynuacja poprzedniego bloku
-      linesCopy=linesCopy.filter(function(l){return l.indexOf("*Inne*")<0;});
-    }
-    var lines=linesCopy.join("\n")+"\nSaldo: "+e.saltoAfter+"€";
+    // Pokaż saldo tylko jeśli to ostatni blok lub następny nie jest "Inne"
+    var showSaldo=!nextInne||!thisInne;
+    var lines=linesCopy.join("\n")+(showSaldo?"\nSaldo: "+e.saltoAfter+"€":"");
     txt.textContent=lines;
     var del=document.createElement("button");
     del.style.cssText="position:absolute;top:8px;right:8px;background:transparent;border:1px solid rgba(239,68,68,.4);color:#ef4444;border-radius:8px;padding:3px 8px;font-size:12px;cursor:pointer;";
@@ -2550,6 +2579,7 @@ function idbLoad(cb){
 // Patch kartySaveAll i kartyLoad — localStorage primary, IDB backup dla dużych zdjęć
 var _origKartySaveAll=kartySaveAll;
 kartySaveAll=function(arr){
+  _kartyCache=arr; // Zawsze aktualizuj cache in-memory
   // Zawsze próbuj localStorage z pełnymi danymi
   var saved=false;
   try{localStorage.setItem('loyalty_cards',JSON.stringify(arr));saved=true;}catch(e){}
@@ -2562,16 +2592,25 @@ kartySaveAll=function(arr){
     }
   });
 };
-// Przy starcie wczytaj z IDB — ma pełne dane ze zdjęciami
+// Patch kartyLoad — zawsze z IDB-cache synchronicznie, ale inicjalizuj ze świeżego IDB przy starcie
+var _kartyCache=null; // null = niezainicjalizowany
+function kartyLoad(){
+  if(_kartyCache!==null)return _kartyCache;
+  // Synchroniczny fallback z localStorage (przy pierwszym wywołaniu zanim IDB odpowie)
+  try{var ls=JSON.parse(localStorage.getItem(KARTY_KEY)||"[]");return ls;}catch(e){return [];}
+}
+// Przy starcie wczytaj z IDB — ma pełne dane ze zdjęciami, ustaw cache i odśwież UI
 idbLoad(function(arr){
   if(arr&&arr.length>0){
+    _kartyCache=arr;
     // Nadpisz localStorage pełnymi danymi z IDB
     try{localStorage.setItem('loyalty_cards',JSON.stringify(arr));}catch(e){}
-    if(typeof kartyRender==='function'){
-      var cur=document.getElementById('s-karty');
-      if(cur&&cur.classList.contains('active'))kartyRender();
-    }
+  } else {
+    // IDB puste — zainicjuj cache z localStorage
+    try{_kartyCache=JSON.parse(localStorage.getItem(KARTY_KEY)||"[]");}catch(e){_kartyCache=[];}
   }
+  // Zawsze odśwież widok kart po załadowaniu IDB
+  if(typeof kartyRender==='function')kartyRender();
 });
 
 // OCR Gemini dla rezerwacji
@@ -2579,6 +2618,22 @@ var _ocrImg='';
 function rezImportCsv(input){
   var file=input.files[0];if(!file)return;
   input.value='';
+
+  // Jeśli to obraz — przekieruj do OCR AI
+  if(file.type.indexOf('image/')===0||/\.(jpg|jpeg|png|webp|heic|heif|gif)$/i.test(file.name)){
+    var r2=new FileReader();
+    r2.onload=function(e){
+      _ocrImg=e.target.result;
+      // Otwórz overlay OCR z podglądem już załadowanym
+      document.getElementById('ocrPrevImg').src=_ocrImg;
+      document.getElementById('ocrPrev').style.display='block';
+      document.getElementById('ocrPH').style.display='none';
+      document.getElementById('ocrSt').textContent='';
+      document.getElementById('overlayOcr').style.display='flex';
+    };
+    r2.readAsDataURL(file);
+    return;
+  }
   var MONTH_PL={'sty':1,'lut':2,'mar':3,'kwi':4,'maj':5,'cze':6,'lip':7,'sie':8,'wrz':9,'paz':10,'paź':10,'lis':11,'gru':12};
   var curYear=new Date().getFullYear();
   function normDate(d){
@@ -2609,20 +2664,31 @@ function rezImportCsv(input){
     var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
     if(lines.length<2){alert('Plik jest pusty lub ma tylko nagłówki');return;}
     var sep=lines[0].indexOf(';')>lines[0].indexOf(',')?';':',';
+    // Spróbuj też tab
+    var tabCount=(lines[0].match(/\t/g)||[]).length;
+    var commaCount=(lines[0].match(/,/g)||[]).length;
+    var semiCount=(lines[0].match(/;/g)||[]).length;
+    if(tabCount>commaCount&&tabCount>semiCount)sep='\t';
     var headers=lines[0].split(sep).map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
     var colMap={};
     var aliases={
-      checkin:['zameldowanie','check-in','checkin','przyjazd','od','from','arrival','start'],
-      checkout:['wymeldowanie','check-out','checkout','wyjazd','do','to','departure','end'],
-      name:['osoba rezerwująca','osoba rezerw','osoba','imię i nazwisko','imie i nazwisko','gość','gosc','name','guest','person'],
-      country:['kraj','country','narodowość','narodowosc'],
-      adults:['dor.','dor','dorośli','dorosli','adults','adult'],
-      children:['dz.','dz','dzieci','children','kids']
+      checkin:['zameldowanie','check-in','checkin','przyjazd','od','from','arrival','start','check in','data przyjazdu','data zameldowania','arrival date','start date'],
+      checkout:['wymeldowanie','check-out','checkout','wyjazd','do','to','departure','end','check out','data wyjazdu','data wymeldowania','departure date','end date'],
+      name:['osoba rezerwująca','osoba rezerw','osoba','imię i nazwisko','imie i nazwisko','gość','gosc','name','guest','person','guest name','first name','imie','imię','guest/booker','booker','kontakt','contact'],
+      country:['kraj','country','narodowość','narodowosc','nationality'],
+      adults:['dor.','dor','dorośli','dorosli','adults','adult','number of adults','liczba doroslych','dorośli (liczba)'],
+      children:['dz.','dz','dzieci','children','kids','number of children','liczba dzieci']
     };
     Object.keys(aliases).forEach(function(field){
       aliases[field].forEach(function(alias){
         headers.forEach(function(h,i){if(h===alias&&!(field in colMap))colMap[field]=i;});
       });
+    });
+    // Jeśli nadal nie znaleziono checkin/checkout — spróbuj fuzzy match (zawiera słowo)
+    headers.forEach(function(h,i){
+      if(colMap.checkin==null&&(h.indexOf('arriv')>=0||h.indexOf('check-in')>=0||h.indexOf('checkin')>=0||h.indexOf('start')>=0||h.indexOf('zameld')>=0))colMap.checkin=i;
+      if(colMap.checkout==null&&(h.indexOf('depart')>=0||h.indexOf('check-out')>=0||h.indexOf('checkout')>=0||h.indexOf('end')>=0||h.indexOf('wymel')>=0))colMap.checkout=i;
+      if(colMap.name==null&&(h.indexOf('name')>=0||h.indexOf('guest')>=0||h.indexOf('booker')>=0||h.indexOf('person')>=0||h.indexOf('osoba')>=0||h.indexOf('gosc')>=0||h.indexOf('gość')>=0))colMap.name=i;
     });
     var imported=0,skipped=0;
     try{var c=localStorage.getItem('rez_cache');if(c)rezData=JSON.parse(c);}catch(ex){}
@@ -2652,7 +2718,10 @@ function rezImportCsv(input){
     });
     localStorage.setItem('rez_cache',JSON.stringify(rezData));
     rezRender();
-    alert('✓ Zaimportowano '+imported+' rezerwacji'+(skipped?' (pominięto '+skipped+')':'')+'.');
+    var colInfo=Object.keys(colMap).map(function(k){return k+'='+colMap[k];}).join(', ')||'BRAK KOLUMN';
+    var msg='✓ Zaimportowano '+imported+' rezerwacji'+(skipped?' (pominięto '+skipped+')':'')+'.\nWykryte kolumny: '+colInfo;
+    if(imported===0)msg+='.\n\nNagłówki pliku:\n'+headers.slice(0,10).join(' | ');
+    alert(msg);
   };
   reader.readAsText(file,'UTF-8');
 }
