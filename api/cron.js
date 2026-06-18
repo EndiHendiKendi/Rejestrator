@@ -65,26 +65,44 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Śmieci — wysyłaj wieczorem (cron odpala ~07:xx włoskiego czasu = UTC+2 = 05:xx UTC)
-    // Cron odpala raz dziennie rano. Sprawdzamy dzień tygodnia DZIŚ i wysyłamy powiadomienie
-    // na DZISIEJSZY wywóz (zakładamy że cron odpala wcześnie rano przed wywozem).
-    // Harmonogram: pon=Niesegregowane, wt=Ekologiczne, śr=Papier, czw=Szkło(1+3), pt=Plastik&Metale, nd=Niesegregowane
+    // ── Śmieci — TYLKO gdy tryb wakacyjny aktywny, dzień PRZED wywozem o 18:00 czasu włoskiego ──
+    // Harmonogram wywozów: pon=Niesegregowane, wt=Ekologiczne, śr=Papier,
+    //   czw(1+3 tydzień)=Szkło, pt=Ekologiczne, sob=Plastik i Metale
+    // Powiadomienie wysyłamy DZIEŃ PRZED o 18:00 (wystawiasz śmieci wieczorem)
+    // Cron odpala co 15 min — sprawdzamy godzinę włoską (UTC+2 letni / UTC+1 zimowy)
     {
-      const day = d.getDay(); // dzisiejszy dzień (wywóz rano = powiadomienie dziś)
-      const weekNum = Math.ceil(d.getDate()/7);
-      const wk = `waste_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
-      let wasteMsg = null;
-      if (!await kv.get(wk)) {
-        if (day===1) wasteMsg={color:'🔴',name:'Niesegregowane'};
-        else if (day===2) wasteMsg={color:'♻️',name:'Ekologiczne'};
-        else if (day===3) wasteMsg={color:'📄',name:'Papier'};
-        else if (day===4&&(weekNum===1||weekNum===3)) wasteMsg={color:'🟢',name:'Szkło'};
-        else if (day===5) wasteMsg={color:'🟡',name:'Plastik i Metale'};
-        else if (day===0) wasteMsg={color:'🔴',name:'Niesegregowane'};
-        if (wasteMsg) {
-          const dayNames=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
-          await sendPush(sub, {type:'waste',title:`${wasteMsg.color} ŚMIECI`,body:`Dziś wywóz: ${wasteMsg.name} (${dayNames[day]})`}).catch(()=>{});
-          await kv.set(wk,'1'); fired.push('waste');
+      const vacMode = await kv.get('vac_mode');
+      if (vacMode === '1') {
+        // Godzina włoska: sprawdź czy teraz jest 18:xx czasu włoskiego
+        const italyOffset = 2; // CEST (lato); zmień na 1 dla CET zimą — Vercel cron w UTC
+        const italyHour = (d.getUTCHours() + italyOffset) % 24;
+        if (italyHour === 18) {
+          // Jutro = dzień wywozu
+          const tomorrow = new Date(d);
+          tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+          const tomorrowDay = tomorrow.getUTCDay(); // 0=nd,1=pon...
+          const tomorrowDate = tomorrow.getUTCDate();
+          const weekNum = Math.ceil(tomorrowDate / 7);
+
+          const wk = `waste_${d.getUTCFullYear()}_${d.getUTCMonth()}_${d.getUTCDate()}`;
+          let wasteMsg = null;
+          if (!await kv.get(wk)) {
+            const dayNames=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+            if (tomorrowDay===1) wasteMsg={color:'🔴',name:'Niesegregowane'};
+            else if (tomorrowDay===2) wasteMsg={color:'♻️',name:'Ekologiczne'};
+            else if (tomorrowDay===3) wasteMsg={color:'📄',name:'Papier'};
+            else if (tomorrowDay===4&&(weekNum===1||weekNum===3)) wasteMsg={color:'🟢',name:'Szkło'};
+            else if (tomorrowDay===5) wasteMsg={color:'♻️',name:'Ekologiczne'};
+            else if (tomorrowDay===6) wasteMsg={color:'🟡',name:'Plastik i Metale'};
+            if (wasteMsg) {
+              await sendPush(sub, {
+                type:'waste',
+                title:`${wasteMsg.color} Jutro wywóz śmieci`,
+                body:`${wasteMsg.name} — wystaw dziś wieczór (jutro: ${dayNames[tomorrowDay]})`
+              }).catch(()=>{});
+              await kv.set(wk,'1'); fired.push('waste');
+            }
+          }
         }
       }
     }
