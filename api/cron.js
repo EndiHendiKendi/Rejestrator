@@ -65,25 +65,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // Vacation mode — waste reminders at 18:00
-    const vacMode = await kv.get('vac_mode');
-    if (vacMode==='1') {
-      const day = d.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+    // ── Śmieci — wysyłaj wieczorem (cron odpala ~07:xx włoskiego czasu = UTC+2 = 05:xx UTC)
+    // Cron odpala raz dziennie rano. Sprawdzamy dzień tygodnia DZIŚ i wysyłamy powiadomienie
+    // na DZISIEJSZY wywóz (zakładamy że cron odpala wcześnie rano przed wywozem).
+    // Harmonogram: pon=Niesegregowane, wt=Ekologiczne, śr=Papier, czw=Szkło(1+3), pt=Plastik&Metale, nd=Niesegregowane
+    {
+      const day = d.getDay(); // dzisiejszy dzień (wywóz rano = powiadomienie dziś)
+      const weekNum = Math.ceil(d.getDate()/7);
       const wk = `waste_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+      let wasteMsg = null;
       if (!await kv.get(wk)) {
-        let wasteMsg = null;
-        if (day===1) wasteMsg='Wystaw Ekologiczne';
-        else if (day===2) wasteMsg='Wystaw Papier';
-        else if (day===3) {
-          // 1st and 3rd Wednesday of month
-          const weekNum = Math.ceil(d.getDate()/7);
-          if (weekNum===1||weekNum===3) wasteMsg='Wystaw Szk\u0142o';
-        }
-        else if (day===4) wasteMsg='Wystaw Ekologiczne';
-        else if (day===5) wasteMsg='Wystaw Plastiki & Metale';
-        else if (day===0) wasteMsg='Wystaw Niesegregowane';
+        if (day===1) wasteMsg={color:'🔴',name:'Niesegregowane'};
+        else if (day===2) wasteMsg={color:'♻️',name:'Ekologiczne'};
+        else if (day===3) wasteMsg={color:'📄',name:'Papier'};
+        else if (day===4&&(weekNum===1||weekNum===3)) wasteMsg={color:'🟢',name:'Szkło'};
+        else if (day===5) wasteMsg={color:'🟡',name:'Plastik i Metale'};
+        else if (day===0) wasteMsg={color:'🔴',name:'Niesegregowane'};
         if (wasteMsg) {
-          await sendPush(sub, {type:'waste',title:'\uD83D\uDDD1\uFE0F Wywóz \u015bmieci',body:wasteMsg}).catch(()=>{});
+          const dayNames=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+          await sendPush(sub, {type:'waste',title:`${wasteMsg.color} ŚMIECI`,body:`Dziś wywóz: ${wasteMsg.name} (${dayNames[day]})`}).catch(()=>{});
           await kv.set(wk,'1'); fired.push('waste');
         }
       }
