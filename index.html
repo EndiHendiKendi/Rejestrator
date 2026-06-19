@@ -10,6 +10,8 @@
 <meta name="theme-color" content="#0a0a0f"/>
 <title>La Luna di Bastremoli</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 /* ── RESET & BASE ── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -3009,75 +3011,14 @@ recalcDep();
 updateKeyStatus();
 
 // ================================================================
-// LOKALNE POWIADOMIENIA (bez serwera)
-// ================================================================
-// Harmonogram wywozu śmieci — powiadomienia lokalne (bez serwera)
-// Wysyłamy o 18:00 dzień PRZED wywozem, TYLKO gdy tryb wakacyjny aktywny
-(function(){
-  var WASTE_SCHEDULE={
-    1:{color:'🔴',name:'Niesegregowane'},   // pon
-    2:{color:'♻️',name:'Ekologiczne'},       // wt
-    3:{color:'📄',name:'Papier'},            // śr
-    // czw = szkło (1+3 tydzień) — obsługiwane osobno
-    5:{color:'♻️',name:'Ekologiczne'},       // pt
-    6:{color:'🟡',name:'Plastik i Metale'},  // sob
-  };
-  var DAY_NAMES=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
-  function isGlassWeek(d){var w=Math.ceil(d.getDate()/7);return w===1||w===3;}
-
-  var lastNotifDay='';
-
-  function checkLocalNotifs(){
-    // Tylko gdy tryb wakacyjny aktywny
-    if(localStorage.getItem('vac_mode')!=='1')return;
-    if(!('Notification' in window)||Notification.permission!=='granted')return;
-    var now=new Date();
-    var todayKey=now.toDateString();
-    if(lastNotifDay===todayKey)return;
-    var h=now.getHours();
-    if(h!==18)return; // dokładnie o 18:xx
-    lastNotifDay=todayKey;
-
-    var tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
-    var dow=tomorrow.getDay();
-
-    var notif=null;
-    if(dow===4&&isGlassWeek(tomorrow)){
-      notif={color:'🟢',name:'Szkło'};
-    } else if(WASTE_SCHEDULE[dow]){
-      notif=WASTE_SCHEDULE[dow];
-    }
-
-    if(notif){
-      var title=notif.color+' Jutro wywóz śmieci';
-      var body=notif.name+' — wystaw dziś wieczór (jutro: '+DAY_NAMES[dow]+')';
-      sendLocalNotif(title,body,'waste_'+todayKey);
-    }
-  }
-
-  function sendLocalNotif(title,body,tag){
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.ready.then(function(reg){
-        reg.showNotification(title,{
-          body:body,
-          tag:tag||'local',
-          icon:'./icon.png',
-          badge:'./icon.png',
-          requireInteraction:true,
-          vibrate:[200,100,200],
-          data:{url:'/?tab=harmonogram', type:'waste'}
-        });
-      }).catch(function(){
-        try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
-      });
-    } else {
-      try{new Notification(title,{body:body,icon:'./icon.png'});}catch(e){}
-    }
-  }
-
-  setInterval(checkLocalNotifs,60*1000); // sprawdzaj co minutę
-  setTimeout(checkLocalNotifs,5000);
-})();
+// UWAGA: lokalny fallback powiadomień o śmieciach (sprawdzanie co minutę
+// w JS strony) został USUNIĘTY. Działał TYLKO gdy apka była otwarta na
+// ekranie — to właśnie powodowało "magiczne" powiadomienie dokładnie w
+// momencie otwarcia apki, mimo że serwer nic nie wysłał o 18:00.
+// Jedynym źródłem powiadomień o śmieciach jest teraz serwerowy
+// /api/cron (patrz vercel.json + .github/workflows/cron.yml), który
+// działa niezależnie od tego czy telefon/apka są otwarte — tak jak
+// WhatsApp/Gmail. Zob. README.md, sekcja "Powiadomienia push".
 </script>
   <script>
 if ('serviceWorker' in navigator) {
@@ -3085,12 +3026,13 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(function(registration) {
         console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
-        // UWAGA: periodicSync USUNIĘTY — był niedeterministyczny (Chrome odpalał go
-        // w przypadkowych momentach, nie gwarantowanej godzinie 18:00), co powodowało
-        // powiadomienia o śmieciach wysyłane w złym dniu. Powiadomienia o wywozie
-        // śmieci są teraz wysyłane WYŁĄCZNIE przez serwerowy cron (Vercel, co 15 min,
-        // sprawdza godzinę włoską) — działa niezależnie od tego czy apka/telefon
-        // są aktywne, w przewidywalnym, jednym miejscu.
+        // Powiadomienia o wywozie śmieci są wysyłane WYŁĄCZNIE przez serwerowy
+        // endpoint /api/cron, odpytywany co 15 min przez GitHub Actions
+        // (.github/workflows/cron.yml) — działa niezależnie od tego czy
+        // apka/telefon są aktywne, w jednym przewidywalnym miejscu.
+        // Vercel Hobby NIE pozwala na cron częstszy niż raz dziennie —
+        // dlatego harmonogram w vercel.json jest tylko zapasowym tickiem
+        // raz dziennie, a realny "co 15 min" robi GitHub Actions.
       })
       .catch(function(error) {
         console.log('Błąd rejestracji Service Workera:', error);

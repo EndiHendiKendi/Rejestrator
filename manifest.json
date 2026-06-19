@@ -3,16 +3,22 @@
   "name": "La Luna di Bastremoli",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "icon.png",
+      "src": "icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
+    },
+    {
+      "src": "badge.png",
+      "type": "image/png",
+      "sizes": "96x96",
+      "purpose": "monochrome"
     }
   ],
   "start_url": ".",

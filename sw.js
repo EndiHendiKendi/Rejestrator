@@ -28,8 +28,8 @@ self.addEventListener('push', e => {
     tag: data.type,
     renotify: true,
     requireInteraction: true,
-    icon: '/icon.png',
-    badge: '/icon.png',
+    icon: '/icon-192.png',
+    badge: '/badge.png',
     vibrate: [200, 100, 200],
     data: { url: notifUrl },
     actions: [
