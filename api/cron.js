@@ -73,8 +73,10 @@ export default async function handler(req, res) {
     {
       const vacMode = await kv.get('vac_mode');
       if (vacMode === '1') {
-        // Godzina włoska: sprawdź czy teraz jest 18:xx czasu włoskiego
-        const italyOffset = 2; // CEST (lato); zmień na 1 dla CET zimą — Vercel cron w UTC
+        // Godzina włoska: CEST (lato, UTC+2) trwa ost. niedziela marca → ost. niedziela października.
+        // Poza tym okresem jest CET (zima, UTC+1). Liczymy dynamicznie żeby nie przesuwało
+        // się o godzinę i nie wysyłało powiadomień w złej godzinie/dniu w okresie zimowym.
+        const italyOffset = isItalyDST(d) ? 2 : 1;
         const italyHour = (d.getUTCHours() + italyOffset) % 24;
         if (italyHour === 18) {
           // Jutro = dzień wywozu
@@ -195,6 +197,20 @@ function parseIcal(text) {
 }
 function icalToISO(s){s=(s||'').trim();if(s.length===8)return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T12:00:00Z`;return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T${s.slice(9,11)}:${s.slice(11,13)}:${s.slice(13,15)}${s.endsWith('Z')?'Z':''}`;}
 function pad(n){return String(n).padStart(2,'0');}
+
+// Czy w danej dacie (UTC) obowiązuje czas letni środkowoeuropejski (CEST, UTC+2)?
+// DST EU: od ostatniej niedzieli marca 01:00 UTC do ostatniej niedzieli października 01:00 UTC.
+function isItalyDST(d) {
+  const year = d.getUTCFullYear();
+  function lastSunday(month) { // month: 0-indexed
+    const last = new Date(Date.UTC(year, month + 1, 0, 1, 0, 0));
+    last.setUTCDate(last.getUTCDate() - last.getUTCDay());
+    return last;
+  }
+  const dstStart = lastSunday(2);  // ostatnia niedziela marca
+  const dstEnd   = lastSunday(9);  // ostatnia niedziela października
+  return d.getTime() >= dstStart.getTime() && d.getTime() < dstEnd.getTime();
+}
 
 // Web Push
 function b64u(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');}
