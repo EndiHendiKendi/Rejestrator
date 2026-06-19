@@ -1,4 +1,6 @@
-// GET /api/cron — Vercel Cron every 15 minutes
+// GET /api/cron — wywoływany co 15 min przez GitHub Actions
+// (.github/workflows/cron.yml), bo Vercel Hobby pozwala na cron
+// najwyżej raz dziennie. Wpis w vercel.json to tylko zapasowy tick.
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
