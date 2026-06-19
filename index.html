@@ -540,7 +540,7 @@ select.inp{cursor:pointer;}
 <div class="screen" id="s-rezerwacje">
   <div class="topbar">
     <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Sezon 2026</div></div>
-    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
+    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button id="btnRezSync" onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
   </div>
   <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
@@ -1794,11 +1794,16 @@ function fmtDate(iso){
 
 function rezSync(){
   var server=getServer();
+  var btn=document.getElementById("btnRezSync");
   if(!server){openSettings();return;}
+  if(btn){btn.textContent="⏳";btn.style.opacity="0.6";btn.disabled=true;}
   fetch(server+"/api/reservations")
     .then(function(r){return r.json();})
     .then(function(d){
-      if(!d.reservations)return;
+      if(!d.reservations){
+        if(btn){btn.textContent="!";btn.style.opacity="1";btn.disabled=false;setTimeout(function(){btn.innerHTML="&#x1f504;";},2000);}
+        return;
+      }
       var incoming=d.reservations;
       // Wczytaj lokalne dane (z edycjami użytkownika)
       var local=rezData.length?rezData:[];
@@ -1838,8 +1843,12 @@ function rezSync(){
       rezData=merged;
       localStorage.setItem("rez_cache",JSON.stringify(rezData));
       rezRender();
+      if(btn){btn.textContent="✓";btn.style.opacity="1";btn.disabled=false;setTimeout(function(){btn.innerHTML="&#x1f504;";},2000);}
     })
-    .catch(function(e){console.error("rezSync:",e);});
+    .catch(function(e){
+      console.error("rezSync:",e);
+      if(btn){btn.textContent="!";btn.style.opacity="1";btn.disabled=false;setTimeout(function(){btn.innerHTML="&#x1f504;";},2000);}
+    });
 }
 
 function rezRender(){
@@ -2808,8 +2817,8 @@ async function ocrGo(){
   st.style.color='var(--gold2)';st.textContent='Analizuję...';
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
 
-  // Prompt obsługuje zarówno pojedynczą rezerwację jak i całą tabelę
-  var aiScanPrompt='Przeanalizuj ten screenshot. Moze to byc screenshot z Airbnb/Booking (jedna rezerwacja) LUB tabela z wieloma rezerwacjami.\n\nJesli to TABELA z wieloma wierszami: odpowiedz tablicą JSON:\n[{"name":"imie nazwisko","adults":"liczba","children":"liczba lub 0","country":"kraj PO POLSKU","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"},...]\n\nJesli to POJEDYNCZA rezerwacja: odpowiedz jednym obiektem JSON:\n{"name":"imie nazwisko","adults":"liczba","children":"liczba lub 0","country":"kraj PO POLSKU","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}\n\nKraj PO POLSKU: Niemcy, Francja, Włochy, Szwajcaria, Polska, Wielka Brytania, Holandia, Austria, Hiszpania, Belgia, Szwecja, Dania, Norwegia, Czechy, Chorwacja, Włochy itd.\nOdpowiedz TYLKO surowym JSON bez backtickow, markdown, komentarzy. Daty jako YYYY-MM-DD. Jesli nie widac wartosci: pusty string lub 0.';
+  // Prompt: ZAWSZE zwróć tablicę, nawet dla jednego gościa — eliminuje niejednoznaczność
+  var aiScanPrompt='Przeanalizuj ten screenshot dokladnie, wiersz po wierszu. To moze byc tabela z WIELOMA rezerwacjami (np. 14 wierszy) albo jeden screenshot z Airbnb/Booking.\n\nWAZNE: Jesli widzisz tabele z wieloma wierszami — MUSISZ wyekstrahowac KAZDY POJEDYNCZY wiersz, nie tylko pierwszy czy najbardziej widoczny. Policz wiersze w tabeli i zwroc tyle samo obiektow w tablicy.\n\nOdpowiedz WYLACZNIE tablica JSON (nawet jesli jest tylko jeden gosc, zwroc tablice z jednym elementem):\n[\n  {"name":"imie nazwisko goscia","adults":"liczba doroslych","children":"liczba dzieci lub 0","country":"kraj PO POLSKU","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"},\n  {"name":"...","adults":"...","children":"...","country":"...","checkin":"...","checkout":"..."}\n]\n\nKraj PO POLSKU, np: Niemcy, Francja, Włochy, Szwajcaria, Polska, Wielka Brytania, Holandia, Austria, Hiszpania, Belgia, Szwecja, Dania, Norwegia, Czechy, Chorwacja, Litwa.\nRok dla dat: jesli nie podany na screenie, uzyj 2026. Format daty zawsze YYYY-MM-DD.\nOdpowiedz TYLKO surowym JSON — bez markdown, bez backtickow, bez komentarzy, bez tekstu przed/po.\nJesli pola nie widac: pusty string "" dla tekstu, "0" dla liczb.';
 
   try{
     var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+key,{
@@ -2885,8 +2894,31 @@ async function ocrGo(){
       return;
     }
 
-    // TRYB POJEDYNCZY: jeden wiersz → pokaż opcje jak wcześniej
+    // TRYB POJEDYNCZY: jeden wiersz → spróbuj auto-match po dacie, dopiero potem pytaj
     var p=rows[0];
+
+    // Spróbuj automatycznie dopasować po dacie checkin (dokładne dopasowanie)
+    var autoIdx=-1;
+    if(p.checkin){
+      for(var ai=0;ai<rezData.length;ai++){
+        if((rezData[ai].start||'').slice(0,10)===p.checkin){autoIdx=ai;break;}
+      }
+    }
+    if(autoIdx>=0){
+      if(p.name&&p.name.trim())rezData[autoIdx]._name=p.name.trim();
+      if(p.adults&&String(p.adults).trim()!=='')rezData[autoIdx].adults=String(p.adults).trim();
+      if(p.children!=null&&String(p.children).trim()!=='')rezData[autoIdx].children=String(p.children).trim();
+      if(p.country&&p.country.trim())rezData[autoIdx].country=p.country.trim();
+      rezData[autoIdx]._edited=true;
+      localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      setTimeout(kvPush,500);
+      st.style.color='#4ade80';
+      st.textContent='✓ Zaktualizowano: '+(p.name||rezData[autoIdx].summary||'?');
+      setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
+      return;
+    }
+
+    // Brak dopasowania po dacie — zapytaj którą rezerwację zaktualizować
     var found='Znaleziono:\n'
       +'👤 '+(p.name||'—')+'\n'
       +'👥 Dorośli: '+(p.adults||'—')+'  Dzieci: '+(p.children||'0')+'\n'
@@ -3026,16 +3058,12 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(function(registration) {
         console.log('Service Worker zarejestrowany pomyślnie:', registration.scope);
-        // Periodic Background Sync — śmieci w tle (Android Chrome)
-        if ('periodicSync' in registration) {
-          Notification.requestPermission().then(function(perm) {
-            if (perm === 'granted') {
-              registration.periodicSync.register('waste-check', {
-                minInterval: 12 * 60 * 60 * 1000 // co 12h minimum
-              }).catch(function(e){ console.log('periodicSync:', e); });
-            }
-          });
-        }
+        // UWAGA: periodicSync USUNIĘTY — był niedeterministyczny (Chrome odpalał go
+        // w przypadkowych momentach, nie gwarantowanej godzinie 18:00), co powodowało
+        // powiadomienia o śmieciach wysyłane w złym dniu. Powiadomienia o wywozie
+        // śmieci są teraz wysyłane WYŁĄCZNIE przez serwerowy cron (Vercel, co 15 min,
+        // sprawdza godzinę włoską) — działa niezależnie od tego czy apka/telefon
+        // są aktywne, w przewidywalnym, jednym miejscu.
       })
       .catch(function(error) {
         console.log('Błąd rejestracji Service Workera:', error);
