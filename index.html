@@ -2825,27 +2825,54 @@ async function ocrGo(){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:aiScanPrompt},{inline_data:{mime_type:mime,data:b64}}]}],
-        generationConfig:{temperature:0,maxOutputTokens:2048}
+        generationConfig:{temperature:0,maxOutputTokens:4096,responseMimeType:"application/json"}
       })
     });
     var d=await resp.json();
     if(d.error){st.style.color='#ef4444';st.textContent='Błąd API: '+(d.error.message||'nieznany');return;}
     var candidate=(d.candidates||[])[0];
     if(!candidate){st.style.color='#ef4444';st.textContent='Brak odpowiedzi od AI';return;}
+    if(candidate.finishReason==='MAX_TOKENS'){st.style.color='#ef4444';st.textContent='Odpowiedź AI została ucięta (zbyt duża tabela) — spróbuj zrobić zrzut mniejszego fragmentu tabeli.';return;}
     var txt=((candidate.content||{}).parts||[])[0];
     txt=txt?txt.text||'':'';
     // Wyczyść markdown fences
     txt=txt.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
 
-    // Spróbuj parsować jako tablicę lub pojedynczy obiekt
-    var parsed=null;
-    var isArray=false;
-    // Spróbuj tablicę
-    var mArr=txt.match(/\[[\s\S]*\]/);
-    if(mArr){try{parsed=JSON.parse(mArr[0]);isArray=true;}catch(e){parsed=null;}}
-    // Spróbuj pojedynczy obiekt
-    if(!parsed){var mObj=txt.match(/\{[\s\S]*\}/);if(mObj){try{parsed=JSON.parse(mObj[0]);isArray=false;}catch(e2){st.style.color='#ef4444';st.textContent='Błąd odczytu: '+e2.message;return;}}}
+    // Wyciągnij pierwszy poprawny JSON (tablica lub obiekt) — bez zachłannego regexa,
+    // który łapał też tekst PO zamknięciu JSON-a (stąd błąd "after JSON at position X")
+    function extractFirstJson(s){
+      var startArr=s.indexOf('['),startObj=s.indexOf('{');
+      var start=-1,openCh,closeCh;
+      if(startArr>=0&&(startObj<0||startArr<startObj)){start=startArr;openCh='[';closeCh=']';}
+      else if(startObj>=0){start=startObj;openCh='{';closeCh='}';}
+      if(start<0)return null;
+      var depth=0,inStr=false,esc=false;
+      for(var i=start;i<s.length;i++){
+        var c=s[i];
+        if(inStr){
+          if(esc){esc=false;}
+          else if(c==='\\'){esc=true;}
+          else if(c==='"'){inStr=false;}
+          continue;
+        }
+        if(c==='"'){inStr=true;continue;}
+        if(c===openCh)depth++;
+        else if(c===closeCh){depth--;if(depth===0)return s.slice(start,i+1);}
+      }
+      return null; // niedomknięty JSON
+    }
+    var jsonStr=extractFirstJson(txt);
+    var parsed=null,isArray=false;
+    if(jsonStr){
+      try{parsed=JSON.parse(jsonStr);isArray=Array.isArray(parsed);}
+      catch(pe){st.style.color='#ef4444';st.textContent='Błąd odczytu: '+pe.message;return;}
+    }
     if(!parsed){st.style.color='#ef4444';st.textContent='AI nie znalazło danych na screenie';return;}
+    // Jeśli to obiekt-wrapper typu {"reservations":[...]}, wyciągnij tablicę
+    if(!isArray&&parsed&&typeof parsed==='object'){
+      var arrKey=Object.keys(parsed).find(function(k){return Array.isArray(parsed[k]);});
+      if(arrKey){parsed=parsed[arrKey];isArray=true;}
+    }
 
     // Znormalizuj do tablicy
     var rows=isArray?parsed:[parsed];
