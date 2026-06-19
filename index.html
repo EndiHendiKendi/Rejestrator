@@ -1652,10 +1652,26 @@ function rzCommit(){
 function rzFullText(){
   var data=rzLoad();
   var lines=["*Rozliczenie "+new Date().getFullYear()+":*",""];
-  data.entries.forEach(function(e){
-    e.lines.forEach(function(l){lines.push(l);});
-    lines.push("Saldo: "+e.saltoAfter+"\u20AC");
-    lines.push("");
+  function isInneOnlyEntry(e){
+    var ll=e.lines;
+    return ll.length>0&&ll[0].indexOf("*Inne*")>=0&&
+      !ll.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
+  }
+  data.entries.forEach(function(e,i){
+    var linesCopy=e.lines.slice();
+    var thisInne=isInneOnlyEntry(e);
+    var prevInne=i>0&&isInneOnlyEntry(data.entries[i-1]);
+    var nextInne=i<data.entries.length-1&&isInneOnlyEntry(data.entries[i+1]);
+    // Usuń nagłówek *Inne* jeśli to kontynuacja poprzedniego bloku Inne
+    if(thisInne&&prevInne){
+      linesCopy=linesCopy.filter(function(l){return l.indexOf("*Inne*")<0;});
+    }
+    linesCopy.forEach(function(l){lines.push(l);});
+    // Saldo tylko jeśli to ostatni blok lub następny nie jest Inne
+    if(!thisInne||!nextInne){
+      lines.push("Saldo: "+e.saltoAfter+"\u20AC");
+      lines.push("");
+    }
   });
   return lines.join("\n");
 }
@@ -2456,8 +2472,47 @@ async function kvPull() {
     if (dd.guest_hist) localStorage.setItem('guest_history', dd.guest_hist);
     if (dd.karty)      localStorage.setItem('loyalty_cards', dd.karty);
     if (dd.ical_url)   localStorage.setItem('ical_url', dd.ical_url);
-    if (dd.rez_cache)  localStorage.setItem('rez_cache', dd.rez_cache);
     if (dd.vac_mode)   localStorage.setItem('vac_mode', dd.vac_mode);
+    // rez_cache: MERGE zamiast nadpisywania — zachowuj lokalne edycje użytkownika
+    if (dd.rez_cache) {
+      try {
+        var incoming = JSON.parse(dd.rez_cache);
+        var localRaw = localStorage.getItem('rez_cache');
+        var local = localRaw ? JSON.parse(localRaw) : [];
+        // Zbuduj mapę lokalnych edytowanych wpisów
+        var localByUid = {}, localByStart = {};
+        local.forEach(function(ev) {
+          if (ev.uid) localByUid[ev.uid] = ev;
+          if (ev.start) localByStart[(ev.start||'').slice(0,10)] = ev;
+        });
+        // Merge: zachowaj lokalne edycje, weź serwer dla nieedytowanych
+        var merged = incoming.map(function(ev) {
+          var loc = localByUid[ev.uid] || localByStart[(ev.start||'').slice(0,10)];
+          if (loc && loc._edited) {
+            return Object.assign({}, ev, {
+              _name: loc._name || ev._name,
+              adults: loc.adults || ev.adults,
+              children: loc.children !== undefined ? loc.children : ev.children,
+              country: loc.country || ev.country,
+              _edited: true
+            });
+          }
+          if (loc && loc._name) return Object.assign({}, ev, {_name: loc._name});
+          return ev;
+        });
+        // Zachowaj lokalne wpisy OCR/manual których nie ma na serwerze
+        local.forEach(function(ev) {
+          if (ev.uid && (ev.uid.indexOf('ocr_')===0 || ev.uid.indexOf('manual_')===0 || ev.uid.indexOf('csv_')===0)) {
+            var exists = merged.some(function(m){return m.uid===ev.uid;});
+            if (!exists) merged.push(ev);
+          }
+        });
+        localStorage.setItem('rez_cache', JSON.stringify(merged));
+      } catch(mergeErr) {
+        // Fallback: jeśli merge się nie uda, zachowaj lokalną kopię
+        if (!localStorage.getItem('rez_cache')) localStorage.setItem('rez_cache', dd.rez_cache);
+      }
+    }
     localStorage.setItem(KV_SYNC_KEY, Date.now());
     // Refresh UI
     rzRefreshHistory();
@@ -2752,13 +2807,16 @@ async function ocrGo(){
   if(!key){st.style.color='#ef4444';st.textContent='Brak klucza Gemini w Ustawieniach';return;}
   st.style.color='var(--gold2)';st.textContent='Analizuję...';
   var b64=_ocrImg.split(',')[1],mime=_ocrImg.split(';')[0].split(':')[1];
-  var aiScanPrompt='Przeanalizuj ten screenshot z aplikacji rezerwacyjnej (Airbnb/Booking/Lodgify). Wyciagnij dane i odpowiedz TYLKO surowym JSON (bez backtickow, bez komentarzy):\n{"name":"pelne imie i nazwisko goscia","adults":"liczba doroslych jako cyfra","children":"liczba dzieci jako cyfra lub 0","country":"kraj goscia PO POLSKU (np. Niemcy, Francja, Włochy, Szwajcaria, Polska, Wielka Brytania, Holandia, Austria, Hiszpania, Belgia) — jesli niewidoczny: pusty string","checkin":"data zameldowania YYYY-MM-DD","checkout":"data wymeldowania YYYY-MM-DD"}\nJesli jakiegos pola nie ma na screenie, wstaw pusty string dla tekstowych lub 0 dla liczb.';
+
+  // Prompt obsługuje zarówno pojedynczą rezerwację jak i całą tabelę
+  var aiScanPrompt='Przeanalizuj ten screenshot. Moze to byc screenshot z Airbnb/Booking (jedna rezerwacja) LUB tabela z wieloma rezerwacjami.\n\nJesli to TABELA z wieloma wierszami: odpowiedz tablicą JSON:\n[{"name":"imie nazwisko","adults":"liczba","children":"liczba lub 0","country":"kraj PO POLSKU","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"},...]\n\nJesli to POJEDYNCZA rezerwacja: odpowiedz jednym obiektem JSON:\n{"name":"imie nazwisko","adults":"liczba","children":"liczba lub 0","country":"kraj PO POLSKU","checkin":"YYYY-MM-DD","checkout":"YYYY-MM-DD"}\n\nKraj PO POLSKU: Niemcy, Francja, Włochy, Szwajcaria, Polska, Wielka Brytania, Holandia, Austria, Hiszpania, Belgia, Szwecja, Dania, Norwegia, Czechy, Chorwacja, Włochy itd.\nOdpowiedz TYLKO surowym JSON bez backtickow, markdown, komentarzy. Daty jako YYYY-MM-DD. Jesli nie widac wartosci: pusty string lub 0.';
+
   try{
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key='+key,{
+    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+key,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:aiScanPrompt},{inline_data:{mime_type:mime,data:b64}}]}],
-        generationConfig:{temperature:0,maxOutputTokens:256}
+        generationConfig:{temperature:0,maxOutputTokens:2048}
       })
     });
     var d=await resp.json();
@@ -2767,24 +2825,74 @@ async function ocrGo(){
     if(!candidate){st.style.color='#ef4444';st.textContent='Brak odpowiedzi od AI';return;}
     var txt=((candidate.content||{}).parts||[])[0];
     txt=txt?txt.text||'':'';
-    var m=txt.match(/\{[\s\S]*\}/);
-    if(!m){st.style.color='#ef4444';st.textContent='AI nie znalazło danych na screenie';return;}
-    var p;
-    try{p=JSON.parse(m[0]);}
-    catch(pe){st.style.color='#ef4444';st.textContent='Błąd odczytu: '+pe.message;return;}
+    // Wyczyść markdown fences
+    txt=txt.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
 
-    // Pokaż co AI znalazło i pozwól wybrać rezerwację
+    // Spróbuj parsować jako tablicę lub pojedynczy obiekt
+    var parsed=null;
+    var isArray=false;
+    // Spróbuj tablicę
+    var mArr=txt.match(/\[[\s\S]*\]/);
+    if(mArr){try{parsed=JSON.parse(mArr[0]);isArray=true;}catch(e){parsed=null;}}
+    // Spróbuj pojedynczy obiekt
+    if(!parsed){var mObj=txt.match(/\{[\s\S]*\}/);if(mObj){try{parsed=JSON.parse(mObj[0]);isArray=false;}catch(e2){st.style.color='#ef4444';st.textContent='Błąd odczytu: '+e2.message;return;}}}
+    if(!parsed){st.style.color='#ef4444';st.textContent='AI nie znalazło danych na screenie';return;}
+
+    // Znormalizuj do tablicy
+    var rows=isArray?parsed:[parsed];
+
     try{var cc=localStorage.getItem("rez_cache");if(cc)rezData=JSON.parse(cc);}catch(e){}
 
-    // Zbuduj podgląd znalezionych danych
+    // TRYB TABLICY: wiele wierszy → bulk update istniejących rezerwacji po dacie
+    if(isArray&&rows.length>1){
+      var updated=0,added=0;
+      rows.forEach(function(p){
+        if(!p.name&&!p.checkin)return;
+        // Szukaj pasującej rezerwacji po dacie checkin
+        var matchIdx=-1;
+        if(p.checkin){
+          for(var i=0;i<rezData.length;i++){
+            var evStart=(rezData[i].start||'').slice(0,10);
+            if(evStart===p.checkin){matchIdx=i;break;}
+          }
+        }
+        if(matchIdx>=0){
+          // Zaktualizuj istniejącą
+          if(p.name&&p.name.trim())rezData[matchIdx]._name=p.name.trim();
+          if(p.adults&&String(p.adults).trim()!=='')rezData[matchIdx].adults=String(p.adults).trim();
+          if(p.children!=null&&String(p.children).trim()!=='')rezData[matchIdx].children=String(p.children).trim();
+          if(p.country&&p.country.trim())rezData[matchIdx].country=p.country.trim();
+          rezData[matchIdx]._edited=true;
+          updated++;
+        } else {
+          // Dodaj nową
+          rezData.push({
+            uid:'ocr_'+Date.now()+'_'+added,
+            summary:p.name||'Gość',
+            start:p.checkin||'',end:p.checkout||'',
+            _name:p.name||'',adults:String(p.adults||''),
+            children:String(p.children||'0'),country:p.country||'',
+            _edited:true
+          });
+          added++;
+        }
+      });
+      localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      setTimeout(kvPush,500);
+      st.style.color='#4ade80';
+      st.textContent='✓ Zaktualizowano: '+updated+' · Dodano: '+added;
+      setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},2000);
+      return;
+    }
+
+    // TRYB POJEDYNCZY: jeden wiersz → pokaż opcje jak wcześniej
+    var p=rows[0];
     var found='Znaleziono:\n'
-      +'👤 '+( p.name||'—')+'\n'
+      +'👤 '+(p.name||'—')+'\n'
       +'👥 Dorośli: '+(p.adults||'—')+'  Dzieci: '+(p.children||'0')+'\n'
       +'🌍 Kraj: '+(p.country||'—')+'\n'
       +'📅 '+(p.checkin||'—')+' → '+(p.checkout||'—');
 
-    // Zbuduj listę rezerwacji do wyboru
-    var curYear=new Date().getFullYear();
     var choices=[];
     rezData.forEach(function(ev,i){
       var s=(ev.summary||'').toLowerCase();
@@ -2796,11 +2904,6 @@ async function ocrGo(){
       }
     });
 
-    // Opcja 0 = nowa rezerwacja, zawsze dostępna nawet gdy choices puste
-
-
-    // Pokaż wybór — alert + prompt z numerem
-    // Opcja 0 = nowa rezerwacja, zawsze dostępna
     var choiceText=found+'\n\nKtórą rezerwację zaktualizować? Wpisz numer:\n0. ➕ NOWA rezerwacja (dodaj)\n';
     choices.forEach(function(c,i){choiceText+=(i+1)+'. '+c.label+'\n';});
     var ans=prompt(choiceText,'');
@@ -2808,20 +2911,17 @@ async function ocrGo(){
     var num=parseInt(ans);
 
     if(num===0){
-      // Nowa rezerwacja z danych AI
       var newEv={
         uid:'manual_'+Date.now(),
         summary:p.name||'Gość',
-        start:p.checkin||'',
-        end:p.checkout||'',
-        _name:p.name||'',
-        adults:String(p.adults||''),
-        children:String(p.children||'0'),
-        country:p.country||'',
+        start:p.checkin||'',end:p.checkout||'',
+        _name:p.name||'',adults:String(p.adults||''),
+        children:String(p.children||'0'),country:p.country||'',
         _edited:true
       };
       rezData.push(newEv);
       localStorage.setItem('rez_cache',JSON.stringify(rezData));
+      setTimeout(kvPush,500);
       st.style.color='#4ade80';
       st.textContent='✓ Dodano nową: '+(p.name||'?');
       setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
@@ -2831,14 +2931,13 @@ async function ocrGo(){
     var idx=num-1;
     if(isNaN(idx)||idx<0||idx>=choices.length){st.style.color='#ef4444';st.textContent='Nieprawidłowy numer';return;}
     var realIdx=choices[idx].idx;
-
-    // Zapisz dane
     if(p.name&&p.name.trim())rezData[realIdx]._name=p.name.trim();
     if(p.adults&&String(p.adults).trim()!=='')rezData[realIdx].adults=String(p.adults).trim();
     if(p.children!=null&&String(p.children).trim()!=='')rezData[realIdx].children=String(p.children).trim();
     if(p.country&&p.country.trim())rezData[realIdx].country=p.country.trim();
     rezData[realIdx]._edited=true;
     localStorage.setItem('rez_cache',JSON.stringify(rezData));
+    setTimeout(kvPush,500);
     st.style.color='#4ade80';
     st.textContent='✓ Zaktualizowano: '+(p.name||rezData[realIdx].summary||'?');
     setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
