@@ -149,31 +149,44 @@ function buildSchedule(events, now) {
     const end   = new Date(ev.end).getTime();
     if (isNaN(start)||isNaN(end)) continue;
 
-    // Check-in day 10:00 — Harmonogramy + ciepła woda
-    const h1 = new Date(ev.start); h1.setHours(10,0,0,0);
+    // Check-in day 10:00 (czas włoski) — Harmonogramy + ciepła woda
+    const h1 = italyLocalToUTC(new Date(ev.start), 10);
     if (h1.getTime()>now) sched.push({type:'harmonogram_in',fireAt:h1.getTime(),uid:ev.uid,
       title:'\uD83D\uDCA1 Harmonogramy + ciep\u0142a woda',
       body:'Ustaw pomp\u0119, ledy i podgrzewacz wody.'});
 
-    // Check-in day 17:00 — Zameldowanie
-    const h2 = new Date(ev.start); h2.setHours(17,0,0,0);
+    // Check-in day 17:00 (czas włoski) — Zameldowanie
+    const h2 = italyLocalToUTC(new Date(ev.start), 17);
     if (h2.getTime()>now) sched.push({type:'checkin',fireAt:h2.getTime(),uid:ev.uid,
       title:'\uD83C\uDFE0 Zameldowanie go\u015bci!!',
       body:'Zg\u0142o\u015b do Ross1000 i Questury.'});
 
-    // Check-out day 10:00 — Harmonogramy + ciepła woda
-    const h3 = new Date(ev.end); h3.setHours(10,0,0,0);
+    // Check-out day 10:00 (czas włoski) — Harmonogramy + ciepła woda
+    const h3 = italyLocalToUTC(new Date(ev.end), 10);
     if (h3.getTime()>now) sched.push({type:'harmonogram_out',fireAt:h3.getTime(),uid:ev.uid,
       title:'\uD83D\uDCA1 Harmonogramy + ciep\u0142a woda',
       body:'Przestaw pomp\u0119, ledy i podgrzewacz.'});
 
-    // +2 days after checkout 18:00 — Rozliczenie
-    const h4 = new Date(ev.end); h4.setDate(h4.getDate()+2); h4.setHours(18,0,0,0);
+    // +2 days after checkout 18:00 (czas włoski) — Rozliczenie
+    const h4base = new Date(ev.end); h4base.setUTCDate(h4base.getUTCDate()+2);
+    const h4 = italyLocalToUTC(h4base, 18);
     if (h4.getTime()>now) sched.push({type:'rozliczenie',fireAt:h4.getTime(),uid:ev.uid,
       title:'\uD83D\uDCB0 Czas na rozliczenie!',
       body:`Go\u015bcie wyjechali 2 dni temu. Otw\u00F3rz zak\u0142adk\u0119 Margherita.`});
   }
   return sched;
+}
+
+// Zamienia "dzień kalendarzowy (UTC) z danej daty" + "godzina czasu włoskiego"
+// na konkretny moment UTC, uwzględniając czas letni/zimowy we Włoszech.
+// Używane przez WSZYSTKIE powiadomienia o konkretnej godzinie (harmonogram,
+// zameldowanie, rozliczenie) — ten sam mechanizm co powiadomienie o śmieciach,
+// żeby nie powtórzyć błędu "serwer liczy w UTC, a my chcemy czas włoski".
+function italyLocalToUTC(dayRef, italyHour) {
+  const y = dayRef.getUTCFullYear(), m = dayRef.getUTCMonth(), day = dayRef.getUTCDate();
+  const probe = new Date(Date.UTC(y, m, day, 12, 0, 0));
+  const offset = isItalyDST(probe) ? 2 : 1;
+  return new Date(Date.UTC(y, m, day, italyHour - offset, 0, 0, 0));
 }
 
 // --- Also add vac-mode endpoint in same file via route check ---
