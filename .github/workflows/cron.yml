@@ -1,0 +1,60 @@
+name: Trigger cron (powiadomienia push)
+
+# Vercel Hobby pozwala na wlasny cron najwyzej 1x dziennie, wiec realne
+# "co 15 minut" robi GitHub Actions - odpala sie na serwerach GitHub,
+# calkowicie niezaleznie od telefonu/apki (jak WhatsApp/Gmail).
+#
+# WYMAGANA KONFIGURACJA (jednorazowo):
+# 1. Repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#    - APP_URL      = https://twoj-projekt.vercel.app   (bez ukosnika na koncu)
+#    - CRON_SECRET  = ta sama wartosc co zmienna srodowiskowa CRON_SECRET
+#                     ustawiona w projekcie na Vercel
+# 2. Repo -> Settings -> Actions -> General -> "Workflow permissions" ->
+#    zaznacz "Read and write permissions" i zapisz. (Potrzebne do
+#    keepalive-commitu nizej - bez tego krok push sie nie wykona.)
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  ping-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron
+        run: |
+          curl -sS -m 25 -o /dev/null -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron"
+
+      - name: Checkout (do keepalive-commitu)
+        uses: actions/checkout@v4
+
+      # GitHub wylacza scheduled workflow, jesli w repo nie bylo ZADNEGO
+      # commitu/PR/issue 60 dni. Czesc powiadomien (podatek, IMU) jest
+      # raz w roku, wiec bez tego workflow by sie wylaczyl mimo ze
+      # dziala poprawnie. Ten krok robi commit raz dziennie (krotko po
+      # polnocy UTC) z samym znacznikiem czasu - to "budzi" repo na
+      # zawsze, bez zadnej akcji z Twojej strony.
+      - name: Keepalive commit (raz dziennie, zeby GitHub nie wylaczyl harmonogramu po 60 dniach)
+        run: |
+          HOUR=$(date -u +%H)
+          MIN=$(date -u +%M)
+          if [ "$HOUR" = "00" ] && [ "$MIN" -lt 15 ]; then
+            mkdir -p .github
+            date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/.keepalive
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .github/.keepalive
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: keepalive (utrzymuje harmonogram cron aktywny)"
+              git push
+            fi
+          else
+            echo "Nie czas na keepalive commit, pomijam."
+          fi
+
