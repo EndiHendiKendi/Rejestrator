@@ -698,7 +698,7 @@ z kodem QR lub kodem kreskowym</div>
     <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
     <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
     <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Synchronizacja danych</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Rozliczenia, karty, historia — synchronizowane między urządzeniami przez serwer Vercel.</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Rozliczenia, karty (razem ze zdjęciami kodów), historia — synchronizowane między urządzeniami/adresami przez serwer Vercel.</div>
     <div style="display:flex;gap:8px;margin-bottom:8px;">
       <button onclick="kvPush()" class="btn btn-secondary" style="flex:1;font-size:13px;">↑ Wyślij dane</button>
       <button onclick="kvPull()" class="btn btn-secondary" style="flex:1;font-size:13px;">↓ Pobierz dane</button>
@@ -2371,18 +2371,40 @@ function overlayKartyAddClose(){
   if(ov)ov.style.display="none";
 }
 
+// Zmniejsza zdjęcie (canvas) tak, żeby zmieściło się bez problemu lokalnie
+// i w backupie online — zdjęcie z aparatu (2-4 MB) → ok. 50-150 KB.
+function compressImageDataUrl(dataUrl, maxDim, quality, cb) {
+  var img = new Image();
+  img.onload = function () {
+    var w = img.width, h = img.height;
+    if (w > h && w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; }
+    else if (h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; }
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // tło dla zdjęć z przezroczystością
+    ctx.drawImage(img, 0, 0, w, h);
+    try { cb(canvas.toDataURL('image/jpeg', quality)); }
+    catch (e) { cb(dataUrl); } // fallback — oryginał, gdyby coś się nie udało
+  };
+  img.onerror = function () { cb(dataUrl); };
+  img.src = dataUrl;
+}
+
 function kartyImgSelected(input){
   var file=input.files[0];
   if(!file)return;
   var reader=new FileReader();
   reader.onload=function(e){
-    _kartyAddImgData=e.target.result;
-    var prev=document.getElementById("kartyImgPreview");
-    var img=document.getElementById("kartyImgPreviewImg");
-    var ph=document.getElementById("kartyImgPlaceholder");
-    if(img)img.src=_kartyAddImgData;
-    if(prev)prev.style.display="block";
-    if(ph)ph.style.display="none";
+    compressImageDataUrl(e.target.result, 900, 0.72, function(compressed){
+      _kartyAddImgData=compressed;
+      var prev=document.getElementById("kartyImgPreview");
+      var img=document.getElementById("kartyImgPreviewImg");
+      var ph=document.getElementById("kartyImgPlaceholder");
+      if(img)img.src=_kartyAddImgData;
+      if(prev)prev.style.display="block";
+      if(ph)ph.style.display="none";
+    });
   };
   reader.readAsDataURL(file);
 }
@@ -2450,11 +2472,15 @@ var KV_SYNC_KEY = 'kv_last_sync';
 async function kvPush() {
   var server = getServer();
   if (!server) return;
+  var kartyFull = await new Promise(function(resolve){
+    try { idbLoad(function(arr){ resolve((arr && arr.length) ? JSON.stringify(arr) : localStorage.getItem('loyalty_cards')); }); }
+    catch(e){ resolve(localStorage.getItem('loyalty_cards')); }
+  });
   var payload = {
     rz_data:    localStorage.getItem('rz_' + new Date().getFullYear()),
     rz_year:    localStorage.getItem('rz_year'),
     guest_hist: localStorage.getItem('guest_history'),
-    karty:      localStorage.getItem('loyalty_cards'),
+    karty:      kartyFull,
     ical_url:   localStorage.getItem('ical_url'),
     rez_cache:  localStorage.getItem('rez_cache'),
     vac_mode:   localStorage.getItem('vac_mode'),
@@ -2481,7 +2507,10 @@ async function kvPull() {
     if (dd.rz_data)    localStorage.setItem('rz_' + new Date().getFullYear(), dd.rz_data);
     if (dd.rz_year)    localStorage.setItem('rz_year', dd.rz_year);
     if (dd.guest_hist) localStorage.setItem('guest_history', dd.guest_hist);
-    if (dd.karty)      localStorage.setItem('loyalty_cards', dd.karty);
+    if (dd.karty) {
+      try { kartySaveAll(JSON.parse(dd.karty)); }
+      catch(e) { localStorage.setItem('loyalty_cards', dd.karty); }
+    }
     if (dd.ical_url)   localStorage.setItem('ical_url', dd.ical_url);
     if (dd.vac_mode)   localStorage.setItem('vac_mode', dd.vac_mode);
     // rez_cache: MERGE zamiast nadpisywania — zachowuj lokalne edycje użytkownika
@@ -2542,9 +2571,7 @@ async function kvPull() {
 var _origRzSave = rzSave;
 rzSave = function(d) { _origRzSave(d); setTimeout(kvPush, 500); };
 
-// Auto-push po każdej zmianie w kartach
-var _origKartySaveAll = kartySaveAll;
-kartySaveAll = function(arr) { _origKartySaveAll(arr); setTimeout(kvPush, 500); };
+// (auto-push po zapisie karty jest teraz częścią patcha kartySaveAll niżej)
 
 // Pull przy każdym starcie apki — zachowuje dane po aktualizacji
 (function(){
@@ -2660,6 +2687,7 @@ kartySaveAll=function(arr){
       var slim=arr.map(function(c,i){return{name:c.name,pos:i,added:c.added||0};});
       try{localStorage.setItem('loyalty_cards',JSON.stringify(slim));}catch(e2){}
     }
+    if(typeof kvPush==='function') setTimeout(kvPush,500);
   });
 };
 // Patch kartyLoad — zawsze z IDB-cache synchronicznie, ale inicjalizuj ze świeżego IDB przy starcie
