@@ -2608,12 +2608,16 @@ async function _pinCheck() {
 }
 
 // Pokaż PIN jeśli nie zalogowany
-(function() {
+// UWAGA: ten div (#pinLock) jest zdefiniowany w HTML PO tym <script> —
+// document.getElementById tutaj, bez odczekania, zawsze zwracał null,
+// więc blokada nigdy się nie pokazywała na żadnym urządzeniu. Czekamy na
+// DOMContentLoaded, żeby div na pewno już istniał.
+document.addEventListener("DOMContentLoaded", function() {
   if (localStorage.getItem("pin_auth") !== "1") {
     var lock = document.getElementById("pinLock");
     if (lock) lock.style.display = "flex";
   }
-})();
+});
 
 
 // IndexedDB dla kart (brak limitu rozmiaru)
