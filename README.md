@@ -49,23 +49,26 @@ PWA do zarządzania rezerwacjami + powiadomienia push (check-in/out, śmieci, po
   (tak jak WhatsApp/Gmail) robi **GitHub Actions**:
   `.github/workflows/cron.yml`.
 
-## Krok 3 — GitHub Actions (jednorazowo, ~2 minuty)
+## Krok 3 — cron-job.org (jednorazowo, ~5 minut)
 
-To jedyne miejsce, gdzie wracasz, jeśli coś chcesz zmienić w przyszłości.
+**UWAGA — zmiana:** GitHub Actions jako "budzik co 15 min" okazał się niewiarygodny w
+praktyce (GitHub sam pisze, że częste harmonogramy są "best effort" i mogą się
+odkładać nawet o godziny — i tak się stało: w 20+ godzin odpalił się 3 razy
+zamiast ~80). Zamiast tego używamy **cron-job.org** — darmowego serwisu
+stworzonego dokładnie do tego zadania, bez YAML i bez plików w repo.
 
-Repo → **Settings → Secrets and variables → Actions** → dodaj:
-- `APP_URL` — `https://twoj-projekt.vercel.app` (bez `/` na końcu)
-- `CRON_SECRET` — ta sama wartość co w zmiennych środowiskowych na Vercel
+1. Wejdź na **cron-job.org** → załóż darmowe konto (tylko e-mail, bez karty).
+2. **Create cronjob**:
+   - **URL**: `https://twoj-projekt.vercel.app/api/cron`
+   - **Schedule**: co 15 minut
+   - **Request method**: GET
+   - **Advanced → Headers** → dodaj nagłówek `Authorization` o wartości
+     `Bearer TWÓJ_CRON_SECRET` (ta sama wartość, co `CRON_SECRET` w
+     zmiennych środowiskowych na Vercelu — ze spacją po "Bearer").
+3. Zapisz.
 
-Jeśli repo jest publiczne, GitHub *mógłby* po 60 dniach bez żadnego commitu
-wyłączyć harmonogram — workflow ma to już rozwiązane samodzielnie: raz dziennie
-robi mały "keepalive" commit, więc nawet jeśli realne powiadomienia (np.
-podatek czy IMU) zdarzają się raz w roku, harmonogram nigdy się nie wyłączy
-i nie musisz o tym pamiętać. Jedyny wymagany krok z Twojej strony: w
-**Settings → Actions → General → Workflow permissions** zaznacz
-**"Read and write permissions"** — bez tego ten commit nie ma prawa się wykonać
-(GitHub poprosi Cię o to przy pierwszym nieudanym uruchomieniu, zobaczysz to
-w zakładce Actions).
+To jedyny "budzik" — możesz usunąć `.github/workflows/cron.yml` z repo
+(GitHub → wejdź w plik → ikona kosza → Commit), niepotrzebny.
 
 ## Ikony
 
