@@ -142,6 +142,20 @@ export default async function handler(req, res) {
 
     // Jednorazowe przypomnienia dla wszystkiego, co wisi nieoznaczone >24h
     await sendReminders(kv, sub);
+
+    // Backup co tydzień — jeśli apka nie była otwierana >7 dni, auto-backup
+    // w tle nie miał szansy zadziałać. Przypomnij raz w tygodniu, nie częściej.
+    {
+      const lastBackup = await kv.get('last_backup_at');
+      const weekNum = Math.floor(now / (7*86400000));
+      const bk = `backup_reminder_${weekNum}`;
+      if ((!lastBackup || now - lastBackup > 7*86400000) && !await kv.get(bk)) {
+        const entry={type:'backup',title:'\uD83D\uDCE6 Backup danych',body:'Dawno nie by\u0142o synchronizacji z serwerem \u2014 otw\u00F3rz apk\u0119 (sama wy\u015ble dane w tle).'};
+        await sendPush(sub, entry).catch(()=>{});
+        await addToInbox(kv, entry);
+        await kv.set(bk,'1'); fired.push('backup');
+      }
+    }
     
     return res.status(200).json({ ok:true, fired, remaining:remaining.length });
   } catch(e) {

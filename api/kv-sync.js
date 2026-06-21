@@ -11,6 +11,7 @@ export default async function handler(req, res) {
       const { action, data } = req.body;
       if (action==='push' && data) {
         await kv.set('app_data', JSON.stringify(data));
+        await kv.set('last_backup_at', Date.now());
         return res.status(200).json({ ok:true });
       }
     }
