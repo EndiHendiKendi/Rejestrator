@@ -44,6 +44,7 @@ export default async function handler(req, res) {
 
     for (const n of due) {
       await sendPush(sub, {type:n.type,title:n.title,body:n.body}).catch(()=>{});
+      await addToInbox(kv, {type:n.type,title:n.title,body:n.body});
       fired.push(n.type);
     }
     await kv.set('notif_schedule', JSON.stringify(remaining));
@@ -53,7 +54,9 @@ export default async function handler(req, res) {
     if (d.getDate()===25) {
       const mk = `meter_${d.getFullYear()}_${d.getMonth()}`;
       if (!await kv.get(mk)) {
-        await sendPush(sub, {type:'licznik',title:'\uD83D\uDCA7 Licznik wody',body:'Odczytaj licznik wody \u2014 25. dzie\u0144 miesi\u0105ca.'}).catch(()=>{});
+        const entry={type:'licznik',title:'\uD83D\uDCA7 Licznik wody',body:'Odczytaj licznik wody \u2014 25. dzie\u0144 miesi\u0105ca.'};
+        await sendPush(sub, entry).catch(()=>{});
+        await addToInbox(kv, entry);
         await kv.set(mk,'1'); fired.push('licznik');
       }
     }
@@ -62,7 +65,9 @@ export default async function handler(req, res) {
     if (d.getMonth()===4 && d.getDate()===15) {
       const tk = `tax_${d.getFullYear()}`;
       if (!await kv.get(tk)) {
-        await sendPush(sub, {type:'podatek',title:'\uD83D\uDCCB Zeznanie podatkowe',body:'Zeznanie podatkowe \u2014 pliki CU'}).catch(()=>{});
+        const entry={type:'podatek',title:'\uD83D\uDCCB Zeznanie podatkowe',body:'Zeznanie podatkowe \u2014 pliki CU'};
+        await sendPush(sub, entry).catch(()=>{});
+        await addToInbox(kv, entry);
         await kv.set(tk,'1'); fired.push('podatek');
       }
     }
@@ -99,11 +104,13 @@ export default async function handler(req, res) {
             else if (tomorrowDay===5) wasteMsg={color:'♻️',name:'Ekologiczne'};
             else if (tomorrowDay===6) wasteMsg={color:'🟡',name:'Plastik i Metale'};
             if (wasteMsg) {
-              await sendPush(sub, {
+              const entry={
                 type:'waste',
                 title:`${wasteMsg.color} Jutro wywóz śmieci`,
                 body:`${wasteMsg.name} — wystaw dziś wieczór (jutro: ${dayNames[tomorrowDay]})`
-              }).catch(()=>{});
+              };
+              await sendPush(sub, entry).catch(()=>{});
+              await addToInbox(kv, entry);
               await kv.set(wk,'1'); fired.push('waste');
             }
           }
@@ -116,7 +123,9 @@ export default async function handler(req, res) {
     if (d.getMonth()===5 && d.getDate()===1) {
       const imu1k = `imu1_${d.getFullYear()}`;
       if (!await kv.get(imu1k)) {
-        await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'}).catch(()=>{});
+        const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'};
+        await sendPush(sub, entry).catch(()=>{});
+        await addToInbox(kv, entry);
         await kv.set(imu1k,'1'); fired.push('imu1');
       }
     }
@@ -124,10 +133,15 @@ export default async function handler(req, res) {
     if (d.getMonth()===11 && d.getDate()===1) {
       const imu2k = `imu2_${d.getFullYear()}`;
       if (!await kv.get(imu2k)) {
-        await sendPush(sub, {type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'}).catch(()=>{});
+        const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'};
+        await sendPush(sub, entry).catch(()=>{});
+        await addToInbox(kv, entry);
         await kv.set(imu2k,'1'); fired.push('imu2');
       }
     }
+
+    // Jednorazowe przypomnienia dla wszystkiego, co wisi nieoznaczone >24h
+    await sendReminders(kv, sub);
     
     return res.status(200).json({ ok:true, fired, remaining:remaining.length });
   } catch(e) {
@@ -140,6 +154,41 @@ async function getSub(kv) {
   const raw = await kv.get('push_sub');
   if (!raw) return null;
   return typeof raw==='string'?JSON.parse(raw):raw;
+}
+
+// Dopisuje wysłane powiadomienie do skrzynki (dzwonek w apce) — żeby było
+// widać "nieodczytane", aż użytkownik kliknie X (oznacz jako zrobione).
+async function addToInbox(kv, entry) {
+  try {
+    const items = (await kv.get('notif_inbox')) || [];
+    items.push({
+      id: entry.type + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      type: entry.type, title: entry.title, body: entry.body,
+      firedAt: Date.now(), done: false, reminded: false,
+    });
+    // Trzymaj rozmiar w ryzach: zrobione starsze niż 30 dni i wszystko starsze niż 90 dni — wywal.
+    const cutDone = Date.now() - 30*86400000, cutAll = Date.now() - 90*86400000;
+    const trimmed = items.filter(n => n.firedAt > cutAll && !(n.done && n.firedAt < cutDone));
+    await kv.set('notif_inbox', trimmed);
+  } catch(e) { console.error('addToInbox:', e.message); }
+}
+
+// Jeśli powiadomienie wisi nieoznaczone jako zrobione >24h — wysyłamy
+// JEDNORAZOWE przypomnienie o tej samej godzinie następnego dnia.
+async function sendReminders(kv, sub) {
+  try {
+    const items = (await kv.get('notif_inbox')) || [];
+    const now = Date.now();
+    let changed = false;
+    for (const n of items) {
+      if (!n.done && !n.reminded && (now - n.firedAt) >= 24*3600000) {
+        await sendPush(sub, { type:n.type, title:'🔁 Przypomnienie: ' + n.title, body:n.body }).catch(()=>{});
+        n.reminded = true;
+        changed = true;
+      }
+    }
+    if (changed) await kv.set('notif_inbox', items);
+  } catch(e) { console.error('sendReminders:', e.message); }
 }
 
 function buildSchedule(events, now) {
