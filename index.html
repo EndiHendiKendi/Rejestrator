@@ -284,9 +284,15 @@ select.inp{cursor:pointer;}
     <img src="logo.png" alt="La Luna di Bastremoli" style="height:40px;width:auto;object-fit:contain;max-width:200px;"/>
     <div style="display:flex;gap:6px;align-items:center;">
       <button id="btnIcalRefresh" onclick="doIcalSync()" title="Odśwież iCal" style="background:transparent;border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:17px;cursor:pointer;padding:5px 8px;border-radius:10px;line-height:1;">&#x1f504;</button>
+      <div class="icon-btn" id="btnNotifBell" style="position:relative;" onclick="openNotifPanel()">
+        🔔
+        <span id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e53935;color:#fff;font-size:10px;font-weight:700;line-height:1;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
+      </div>
       <div class="icon-btn" id="btnSettings">⚙️</div>
     </div>
   </div>
+
+  <div id="todayBanner"></div>
 
   <div class="card-gold">
     <div style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:rgba(201,169,110,.6);margin-bottom:14px;">📅 Pobyt</div>
@@ -1794,6 +1800,43 @@ function fmtDate(iso){
   return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
 }
 
+// ── Baner "Dziś / Jutro" na ekranie głównym — szybki podgląd przyjazdów/wyjazdów ──
+function renderTodayBanner(){
+  var el = document.getElementById('todayBanner');
+  if(!el) return;
+  var data = [];
+  try { var c = localStorage.getItem('rez_cache'); if(c) data = JSON.parse(c); } catch(e){}
+  if(!data.length){ el.innerHTML=''; return; }
+
+  function dayKey(d){ var x=new Date(d); return x.getFullYear()+'-'+x.getMonth()+'-'+x.getDate(); }
+  var today = new Date(); var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+  var todayKey = dayKey(today), tomKey = dayKey(tomorrow);
+
+  var rows = [];
+  data.forEach(function(ev){
+    if(!ev.start || !ev.end) return;
+    var name = ev._name || ev.summary || 'Gość';
+    var sKey = dayKey(ev.start), eKey = dayKey(ev.end);
+    if(sKey===todayKey) rows.push({icon:'🟢',label:'Dziś przyjazd',name:name,ord:0});
+    else if(sKey===tomKey) rows.push({icon:'🟢',label:'Jutro przyjazd',name:name,ord:1});
+    if(eKey===todayKey) rows.push({icon:'🔴',label:'Dziś wyjazd',name:name,ord:2});
+    else if(eKey===tomKey) rows.push({icon:'🔴',label:'Jutro wyjazd',name:name,ord:3});
+  });
+
+  if(!rows.length){ el.innerHTML=''; return; }
+  rows.sort(function(a,b){ return a.ord-b.ord; });
+
+  el.innerHTML = '<div class="card-gold" style="padding:14px 16px;margin-bottom:12px;">'
+    + rows.map(function(r){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">'
+          + '<span style="font-size:18px;">'+r.icon+'</span>'
+          + '<div><div style="font-size:13px;color:var(--text3,#999);">'+r.label+'</div>'
+          + '<div style="font-size:15px;font-weight:600;">'+escapeHtml(r.name)+'</div></div>'
+          + '</div>';
+      }).join('<div style="height:1px;background:rgba(255,255,255,.07);margin:2px 0;"></div>')
+    + '</div>';
+}
+
 function rezSync(){
   var server=getServer();
   var btn=document.getElementById("btnRezSync");
@@ -1854,6 +1897,7 @@ function rezSync(){
 }
 
 function rezRender(){
+  renderTodayBanner();
   // Zawsze czytaj świeżo z localStorage — to jest jedyne źródło prawdy
   try{
     var c=localStorage.getItem("rez_cache");
@@ -2644,7 +2688,112 @@ document.addEventListener("DOMContentLoaded", function() {
     var lock = document.getElementById("pinLock");
     if (lock) lock.style.display = "flex";
   }
+  refreshNotifBadge();
+  setInterval(refreshNotifBadge, 5 * 60 * 1000); // odśwież co 5 min, gdy apka otwarta
+  renderTodayBanner();
+  initAutoBackup();
 });
+
+// ── Auto-backup: wcześniej "Wyślij dane" trzeba było klikać ręcznie, więc
+// edycje rezerwacji/rozliczeń wisiały tylko lokalnie, aż ktoś sobie przypomniał.
+// Teraz: push do serwera sam w tle co 10 min (gdy apka otwarta) + zawsze,
+// gdy apka idzie w tło/jest zamykana — więc realnie zawsze aktualne online. ──
+var _autoBackupTimer = null;
+function initAutoBackup(){
+  if (!getServer()) return;
+  if (_autoBackupTimer) clearInterval(_autoBackupTimer);
+  _autoBackupTimer = setInterval(function(){ kvPush(); }, 10 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'hidden') kvPush();
+  });
+  window.addEventListener('pagehide', function(){ kvPush(); });
+}
+
+// ── Skrzynka powiadomień (dzwonek z licznikiem nieprzeczytanych) ──
+var _notifCache = [];
+
+async function refreshNotifBadge(){
+  var server = getServer();
+  if(!server) return;
+  try {
+    var r = await fetch(server + '/api/notifications');
+    var dd = await r.json();
+    _notifCache = (dd && dd.items) ? dd.items : [];
+  } catch(e){ console.log('refreshNotifBadge error:', e.message); return; }
+  var unread = _notifCache.filter(function(n){ return !n.done; });
+  var badge = document.getElementById('notifBadge');
+  if(badge){
+    if(unread.length > 0){
+      badge.textContent = unread.length > 9 ? '9+' : String(unread.length);
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  renderNotifPanel();
+}
+
+function renderNotifPanel(){
+  var list = document.getElementById('notifPanelList');
+  var empty = document.getElementById('notifPanelEmpty');
+  if(!list) return;
+  var unread = _notifCache.filter(function(n){ return !n.done; })
+    .sort(function(a,b){ return (b.firedAt||0) - (a.firedAt||0); });
+  if(!unread.length){
+    list.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  list.innerHTML = unread.map(function(n){
+    var when = n.firedAt ? new Date(n.firedAt).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.06);">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-weight:600;font-size:14px;">' + escapeHtml(n.title||'') + '</div>'
+      + '<div style="font-size:13px;color:var(--text3,#999);margin-top:2px;">' + escapeHtml(n.body||'') + '</div>'
+      + '<div style="font-size:11px;color:var(--text3,#777);margin-top:4px;">' + when + (n.reminded?' · przypomniano':'') + '</div>'
+      + '</div>'
+      + '<button onclick="markNotifDone(\'' + n.id + '\')" title="Oznacz jako zrobione" style="background:rgba(255,255,255,.08);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;line-height:1;cursor:pointer;flex-shrink:0;">×</button>'
+      + '</div>';
+  }).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function openNotifPanel(){
+  var ov = document.getElementById('notifPanelOverlay');
+  if(ov) ov.style.display = 'flex';
+  refreshNotifBadge();
+}
+function closeNotifPanel(){
+  var ov = document.getElementById('notifPanelOverlay');
+  if(ov) ov.style.display = 'none';
+}
+
+async function markNotifDone(id){
+  // Optymistycznie usuń z widoku od razu
+  _notifCache = _notifCache.map(function(n){ return n.id===id ? Object.assign({},n,{done:true}) : n; });
+  renderNotifPanel();
+  var unread = _notifCache.filter(function(n){ return !n.done; });
+  var badge = document.getElementById('notifBadge');
+  if(badge){
+    if(unread.length>0){ badge.textContent = unread.length>9?'9+':String(unread.length); badge.style.display='flex'; }
+    else badge.style.display='none';
+  }
+  var server = getServer();
+  if(!server) return;
+  try {
+    await fetch(server + '/api/notifications', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'done', id: id})
+    });
+  } catch(e){ console.log('markNotifDone error:', e.message); }
+}
 
 
 // IndexedDB dla kart (brak limitu rozmiaru)
@@ -3106,6 +3255,17 @@ if ('serviceWorker' in navigator) {
 <div style="display:flex;align-items:center;gap:14px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.3);border-radius:14px;padding:13px 16px;"><div style="font-size:26px;flex-shrink:0;">🟡</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;color:#ffffff;">Sobota</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px;">Plastiki & Metale</div></div></div>
 </div>
     <button onclick="document.getElementById('overlayWaste').style.display='none';" style="width:100%;margin-top:20px;padding:14px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;">Zamknij</button>
+  </div>
+</div>
+
+<div id="notifPanelOverlay" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.6);align-items:flex-start;justify-content:center;" onclick="if(event.target===this)closeNotifPanel()">
+  <div style="background:var(--card,#1a1a24);border-radius:0 0 18px 18px;width:100%;max-width:480px;margin-top:0;max-height:85vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:var(--card,#1a1a24);">
+      <div style="font-weight:700;font-size:16px;">🔔 Powiadomienia</div>
+      <button onclick="closeNotifPanel()" style="background:transparent;border:none;color:var(--text3,#999);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">×</button>
+    </div>
+    <div id="notifPanelList" style="padding:8px 0;"></div>
+    <div id="notifPanelEmpty" style="display:none;padding:40px 20px;text-align:center;color:var(--text3,#999);font-size:14px;">Brak nieprzeczytanych powiadomień 🎉</div>
   </div>
 </div>
 
