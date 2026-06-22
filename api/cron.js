@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         if (newEvs.length) {
           const sub = await getSub(kv);
           if (sub) for (const ev of newEvs)
-            await sendPush(sub, { type:'new_booking', title:'\uD83D\uDCC5 Nowa rezerwacja! \u2014 Margherita', body:`${ev.summary||'Nowy go\u015b\u0107'} \u2014 wy\u015blij tabel\u0119 Marghericie!` }).catch(()=>{});
+            await sendPush(sub, { type:'new_booking', title:'\uD83D\uDCC5 Nowa rezerwacja! \u2014 Margherita', body:`${ev.summary||'Nowy go\u015b\u0107'} \u2014 wy\u015blij tabel\u0119 Marghericie!` }).catch(e=>console.error('sendPush failed:', e.message));
         }
       } catch(e){ console.error('Daily sync:', e.message); }
     }
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     const fired = [];
 
     for (const n of due) {
-      await sendPush(sub, {type:n.type,title:n.title,body:n.body}).catch(()=>{});
+      await sendPush(sub, {type:n.type,title:n.title,body:n.body}).catch(e=>console.error('sendPush failed:', e.message));
       await addToInbox(kv, {type:n.type,title:n.title,body:n.body});
       fired.push(n.type);
     }
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       const mk = `meter_${d.getFullYear()}_${d.getMonth()}`;
       if (!await kv.get(mk)) {
         const entry={type:'licznik',title:'\uD83D\uDCA7 Licznik wody',body:'Odczytaj licznik wody \u2014 25. dzie\u0144 miesi\u0105ca.'};
-        await sendPush(sub, entry).catch(()=>{});
+        await sendPush(sub, entry).catch(e=>console.error('sendPush failed:', e.message));
         await addToInbox(kv, entry);
         await kv.set(mk,'1'); fired.push('licznik');
       }
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       const tk = `tax_${d.getFullYear()}`;
       if (!await kv.get(tk)) {
         const entry={type:'podatek',title:'\uD83D\uDCCB Zeznanie podatkowe',body:'Zeznanie podatkowe \u2014 pliki CU'};
-        await sendPush(sub, entry).catch(()=>{});
+        await sendPush(sub, entry).catch(e=>console.error('sendPush failed:', e.message));
         await addToInbox(kv, entry);
         await kv.set(tk,'1'); fired.push('podatek');
       }
@@ -109,7 +109,7 @@ export default async function handler(req, res) {
                 title:`${wasteMsg.color} Jutro wywóz śmieci`,
                 body:`${wasteMsg.name} — wystaw dziś wieczór (jutro: ${dayNames[tomorrowDay]})`
               };
-              await sendPush(sub, entry).catch(()=>{});
+              await sendPush(sub, entry).catch(e=>console.error('sendPush failed:', e.message));
               await addToInbox(kv, entry);
               await kv.set(wk,'1'); fired.push('waste');
             }
@@ -124,7 +124,7 @@ export default async function handler(req, res) {
       const imu1k = `imu1_${d.getFullYear()}`;
       if (!await kv.get(imu1k)) {
         const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'};
-        await sendPush(sub, entry).catch(()=>{});
+        await sendPush(sub, entry).catch(e=>console.error('sendPush failed:', e.message));
         await addToInbox(kv, entry);
         await kv.set(imu1k,'1'); fired.push('imu1');
       }
@@ -134,7 +134,7 @@ export default async function handler(req, res) {
       const imu2k = `imu2_${d.getFullYear()}`;
       if (!await kv.get(imu2k)) {
         const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'};
-        await sendPush(sub, entry).catch(()=>{});
+        await sendPush(sub, entry).catch(e=>console.error('sendPush failed:', e.message));
         await addToInbox(kv, entry);
         await kv.set(imu2k,'1'); fired.push('imu2');
       }
@@ -153,7 +153,10 @@ export default async function handler(req, res) {
 async function getSub(kv) {
   const raw = await kv.get('push_sub');
   if (!raw) return null;
-  return typeof raw==='string'?JSON.parse(raw):raw;
+  const parsed = typeof raw==='string'?JSON.parse(raw):raw;
+  // subscribe.js zapisuje { subscription: {...} } — rozpakuj zagnieżdżenie,
+  // ale zostaw kompatybilność gdyby kiedyś zapisano płasko.
+  return parsed.subscription || parsed;
 }
 
 // Dopisuje wysłane powiadomienie do skrzynki (dzwonek w apce) — żeby było
@@ -182,7 +185,7 @@ async function sendReminders(kv, sub) {
     let changed = false;
     for (const n of items) {
       if (!n.done && !n.reminded && (now - n.firedAt) >= 24*3600000) {
-        await sendPush(sub, { type:n.type, title:'🔁 Przypomnienie: ' + n.title, body:n.body }).catch(()=>{});
+        await sendPush(sub, { type:n.type, title:'🔁 Przypomnienie: ' + n.title, body:n.body }).catch(e=>console.error('sendPush failed:', e.message));
         n.reminded = true;
         changed = true;
       }
