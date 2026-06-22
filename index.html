@@ -1812,10 +1812,12 @@ function renderTodayBanner(){
   var today = new Date(); var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
   var todayKey = dayKey(today), tomKey = dayKey(tomorrow);
 
+  var BLOCKED_RE = /closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
   var rows = [];
   data.forEach(function(ev){
     if(!ev.start || !ev.end) return;
     var name = ev._name || ev.summary || 'Gość';
+    if(BLOCKED_RE.test(name)) return; // bloki "Closed Period" itp. — to nie gość
     var sKey = dayKey(ev.start), eKey = dayKey(ev.end);
     if(sKey===todayKey) rows.push({icon:'🟢',label:'Dziś przyjazd',name:name,ord:0});
     else if(sKey===tomKey) rows.push({icon:'🟢',label:'Jutro przyjazd',name:name,ord:1});
