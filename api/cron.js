@@ -79,7 +79,9 @@ export default async function handler(req, res) {
     // Cron odpala co 15 min — sprawdzamy godzinę włoską (UTC+2 letni / UTC+1 zimowy)
     {
       const vacMode = await kv.get('vac_mode');
-      if (vacMode === '1') {
+      // Odporne na typ: KV bywał zapisany jako string '1'/'0', liczba 1/0 lub bool —
+      // String(...) normalizuje wszystko przed porównaniem.
+      if (String(vacMode) === '1') {
         // Godzina włoska: CEST (lato, UTC+2) trwa ost. niedziela marca → ost. niedziela października.
         // Poza tym okresem jest CET (zima, UTC+1). Liczymy dynamicznie żeby nie przesuwało
         // się o godzinę i nie wysyłało powiadomień w złej godzinie/dniu w okresie zimowym.
