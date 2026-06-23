@@ -67,20 +67,30 @@ async function updateAppBadgeFromServer() {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
-  const targetUrl = (e.notification.data && e.notification.data.url) ? e.notification.data.url : './';
+
+  // Budujemy absolutny URL — Chrome otwiera PWA TYLKO gdy URL dokładnie
+  // pasuje do scope zdefiniowanego w manifest.json. Relatywne './' tego
+  // nie gwarantuje, stąd zawsze używamy pełnego origin + ścieżki.
+  const base = self.registration.scope; // np. https://laluna.app/
+  const rawUrl = (e.notification.data && e.notification.data.url) ? e.notification.data.url : './';
+  const targetUrl = new URL(rawUrl, base).href;
+
   e.waitUntil(
     clients.matchAll({type:'window', includeUncontrolled:true}).then(list => {
+      // 1. Szukaj już otwartego okna PWA w scope apki
       for (const c of list) {
-        if (c.url.includes(self.location.origin) && 'focus' in c) {
-          c.focus();
-          // Powiedz apce żeby otworzyła właściwą zakładkę
-          if (targetUrl.includes('tab=')) {
-            const tab = new URL(targetUrl, self.location.origin).searchParams.get('tab');
-            c.postMessage({type:'OPEN_TAB', tab});
-          }
-          return;
+        if (c.url.startsWith(base)) {
+          // Fokus na istniejące okno PWA i ewentualnie przełącz zakładkę
+          return c.focus().then(() => {
+            if (targetUrl.includes('tab=')) {
+              const tab = new URL(targetUrl).searchParams.get('tab');
+              c.postMessage({type:'OPEN_TAB', tab});
+            }
+          });
         }
       }
+      // 2. Brak otwartego okna — otwórz nowe. Absolutny URL = Chrome
+      //    rozpoznaje scope PWA i otwiera w oknie aplikacji, nie w karcie.
       return clients.openWindow(targetUrl);
     })
   );
