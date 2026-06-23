@@ -1717,7 +1717,6 @@ rzRefreshHistory();
 // iCal + PUSH
 // ================================================================
 // WAŻNE: ten klucz musi być IDENTYCZNY jak VAPID_PUBLIC_KEY w Vercel Environment Variables.
-// Wygeneruj parę kluczy (npx web-push generate-vapid-keys) i wklej tu Public Key.
 var VAPID_PUB="BNc6XorYt4GPd75NP1Uz1WLNL9nHgBZ5Y9s7Ka1nt6Ywo4dAEJVtr1Zif7Bu-8hTHkN_9TR45qQzo-qcJ_QT4GE";
 
 function getServer(){return localStorage.getItem("push_server")||"";}
@@ -1728,7 +1727,7 @@ async function testPush(){
   var status = document.getElementById('kvSyncStatus');
   if(status) status.textContent = 'Wysyłam testowe powiadomienie...';
   try {
-    var r = await fetch(server + '/api/test-push');
+    var r = await fetch(server + '/api/test-push', { cache: 'no-store' });
     var dd = await r.json();
     if(dd.ok){
       alert('✅ ' + dd.msg);
