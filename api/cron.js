@@ -37,9 +37,13 @@ export default async function handler(req, res) {
 
     const schedRaw = await kv.get('notif_schedule');
     const schedule = schedRaw ? (typeof schedRaw==='string'?JSON.parse(schedRaw):schedRaw) : [];
-    const win = 15*60*1000;
-    const due = schedule.filter(n=>n.fireAt<=now+win&&n.fireAt>now-win);
-    const remaining = schedule.filter(n=>n.fireAt>now+win);
+    // UWAGA: poprzednio okno było symetryczne (now-15min..now+15min), co
+    // pozwalało wystrzelić powiadomienie do 15 min PRZED właściwą godziną
+    // (np. 09:45 zamiast 10:00) — usunięte. Teraz: leci, gdy czas minął,
+    // niezależnie jak późno cron zdążył odpalić (nigdy nie "zgubimy" po cichu
+    // powiadomienia, gdyby cron-job.org akurat nie strzelił na czas).
+    const due = schedule.filter(n=>n.fireAt<=now);
+    const remaining = schedule.filter(n=>n.fireAt>now);
     const fired = [];
 
     for (const n of due) {
