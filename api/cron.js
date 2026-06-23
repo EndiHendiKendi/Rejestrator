@@ -326,9 +326,14 @@ async function encryptPayload(payload,sub){
   const enc=new TextEncoder();
   async function hkdf(ikm,salt,info,len){const k=await crypto.subtle.importKey('raw',ikm,'HKDF',false,['deriveBits']);return new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info},k,len*8));}
   function cat(...a){const t=a.reduce((n,x)=>n+x.length,0),o=new Uint8Array(t);let p=0;for(const x of a){o.set(x,p);p+=x.length;}return o;}
-  const ikm=await hkdf(shared,auth,enc.encode('Content-Encoding: auth\0'),32);
-  const ck=await hkdf(ikm,salt,cat(enc.encode('Content-Encoding: aes128gcm\0'),new Uint8Array([0]),srvPub,fromb64u(sub.keys.p256dh)),16);
-  const iv=await hkdf(ikm,salt,cat(enc.encode('Content-Encoding: nonce\0'),new Uint8Array([0]),srvPub,fromb64u(sub.keys.p256dh)),12);
+  const cliPub=fromb64u(sub.keys.p256dh);
+  // RFC 8291: IKM info = "WebPush: info" || 0x00 || ua_public (65B) || as_public (65B)
+  const ikm=await hkdf(shared,auth,cat(enc.encode('WebPush: info\0'),cliPub,srvPub),32);
+  // RFC 8291: CEK info = "Content-Encoding: aes128gcm" || 0x00 (brak kluczy publicznych)
+  const ck=await hkdf(ikm,salt,enc.encode('Content-Encoding: aes128gcm\0'),16);
+  // RFC 8291: nonce info = "Content-Encoding: nonce" || 0x00 (brak kluczy publicznych)
+  const iv=await hkdf(ikm,salt,enc.encode('Content-Encoding: nonce\0'),12);
+  // cliPub już zdefiniowany powyżej (fromb64u(sub.keys.p256dh))
   const aes=await crypto.subtle.importKey('raw',ck,'AES-GCM',false,['encrypt']);
   const pt=enc.encode(payload);const rec=new Uint8Array(pt.length+1);rec.set(pt);rec[pt.length]=0x02;
   const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},aes,rec));
