@@ -2703,6 +2703,11 @@ document.addEventListener("DOMContentLoaded", function() {
 var _autoBackupTimer = null;
 function initAutoBackup(){
   if (!getServer()) return;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(function(reg){
+      if (reg.active) reg.active.postMessage({type:'SERVER_URL_UPDATE', server:getServer()});
+    }).catch(function(){});
+  }
   if (_autoBackupTimer) clearInterval(_autoBackupTimer);
   _autoBackupTimer = setInterval(function(){ kvPush(); }, 10 * 60 * 1000);
   document.addEventListener('visibilitychange', function(){
@@ -2731,6 +2736,14 @@ async function refreshNotifBadge(){
     } else {
       badge.style.display = 'none';
     }
+  }
+  // Plakietka z liczbą na samej ikonie apki na ekranie głównym (jak w
+  // natywnych apkach) — wsparte przez Androida/Chrome dla zainstalowanych PWA.
+  if ('setAppBadge' in navigator) {
+    try {
+      if (unread.length > 0) navigator.setAppBadge(unread.length).catch(function(){});
+      else navigator.clearAppBadge().catch(function(){});
+    } catch(e){}
   }
   renderNotifPanel();
 }
@@ -2785,6 +2798,12 @@ async function markNotifDone(id){
   if(badge){
     if(unread.length>0){ badge.textContent = unread.length>9?'9+':String(unread.length); badge.style.display='flex'; }
     else badge.style.display='none';
+  }
+  if ('setAppBadge' in navigator) {
+    try {
+      if (unread.length > 0) navigator.setAppBadge(unread.length).catch(function(){});
+      else navigator.clearAppBadge().catch(function(){});
+    } catch(e){}
   }
   var server = getServer();
   if(!server) return;

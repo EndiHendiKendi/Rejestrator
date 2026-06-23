@@ -23,21 +23,40 @@ self.addEventListener('push', e => {
   // Dla powiadomień o śmieciach — deep link do zakładki harmonogramu
   const notifUrl = data.type === 'waste' ? '/?tab=harmonogram' : '/';
 
-  e.waitUntil(self.registration.showNotification(`${icon} ${data.title}`, {
-    body: data.body,
-    tag: data.type,
-    renotify: true,
-    requireInteraction: true,
-    icon: '/icon-192.png',
-    badge: '/badge.png',
-    vibrate: [200, 100, 200],
-    data: { url: notifUrl },
-    actions: [
-      { action:'open', title:'Otwórz' },
-      { action:'dismiss', title:'Zamknij' }
-    ]
-  }));
+  e.waitUntil(Promise.all([
+    self.registration.showNotification(`${icon} ${data.title}`, {
+      body: data.body,
+      tag: data.type,
+      renotify: true,
+      requireInteraction: true,
+      icon: '/icon-192.png',
+      badge: '/badge.png',
+      vibrate: [200, 100, 200],
+      data: { url: notifUrl },
+      actions: [
+        { action:'open', title:'Otwórz' },
+        { action:'dismiss', title:'Zamknij' }
+      ]
+    }),
+    updateAppBadgeFromServer(),
+  ]));
 });
+
+// Plakietka z liczbą na ikonie apki — aktualizowana też tutaj (nie tylko z
+// otwartej apki), żeby było widać nieprzeczytane nawet gdy apka jest zamknięta.
+async function updateAppBadgeFromServer() {
+  try {
+    const cache = await caches.open('vac-mode-v1');
+    const resp = await cache.match('/push-server');
+    const server = resp ? await resp.text() : '';
+    if (!server || !('setAppBadge' in self.navigator)) return;
+    const r = await fetch(server + '/api/notifications');
+    const dd = await r.json();
+    const unread = ((dd && dd.items) || []).filter(n => !n.done).length;
+    if (unread > 0) self.navigator.setAppBadge(unread);
+    else self.navigator.clearAppBadge();
+  } catch(_) {}
+}
 
 // UWAGA: periodicsync USUNIĘTY — był niedeterministyczny (Chrome odpalał go
 // w przypadkowych momentach, nie gwarantowanej godzinie), co powodowało
@@ -73,6 +92,11 @@ self.addEventListener('message', e => {
     // Apka informuje SW o zmianie trybu wakacyjnego — zapisz do cache
     caches.open('vac-mode-v1').then(cache => {
       cache.put('/vac-mode', new Response(e.data.active ? '1' : '0'));
+    });
+  }
+  if (e.data && e.data.type === 'SERVER_URL_UPDATE' && e.data.server) {
+    caches.open('vac-mode-v1').then(cache => {
+      cache.put('/push-server', new Response(e.data.server));
     });
   }
 });
