@@ -709,6 +709,9 @@ z kodem QR lub kodem kreskowym</div>
       <button onclick="kvPush()" class="btn btn-secondary" style="flex:1;font-size:13px;">↑ Wyślij dane</button>
       <button onclick="kvPull()" class="btn btn-secondary" style="flex:1;font-size:13px;">↓ Pobierz dane</button>
     </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="testPush()" class="btn btn-secondary" style="flex:1;font-size:13px;">🔔 Wyślij testowe powiadomienie</button>
+    </div>
     <div id="kvSyncStatus" style="font-size:12px;color:var(--text3);margin-bottom:16px;min-height:16px;"></div>
     <div style="height:1px;background:rgba(255,255,255,.06);margin:4px 0 16px;"></div>
     <button onclick="pushSubscribe()" class="btn btn-secondary" style="margin-bottom:8px;">&#x1f514; Włącz powiadomienia push</button>
@@ -1716,6 +1719,25 @@ rzRefreshHistory();
 var VAPID_PUB="BIdWnt6gT9XU6e9bB6Wp-7Z0f9Tbe4b6Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_wA";
 
 function getServer(){return localStorage.getItem("push_server")||"";}
+
+async function testPush(){
+  var server = getServer();
+  if(!server){ alert('Brak adresu serwera — ustaw go najpierw wyżej.'); return; }
+  var status = document.getElementById('kvSyncStatus');
+  if(status) status.textContent = 'Wysyłam testowe powiadomienie...';
+  try {
+    var r = await fetch(server + '/api/test-push');
+    var dd = await r.json();
+    if(dd.ok){
+      alert('✅ ' + dd.msg);
+    } else {
+      alert('❌ Błąd na etapie "' + dd.step + '":\n' + dd.error);
+    }
+  } catch(e){
+    alert('❌ Nie udało się nawet połączyć z serwerem: ' + e.message);
+  }
+  if(status) status.textContent = '';
+}
 function icalPanelToggle(){openSettings();}
 async function doIcalSync(){
   var url=localStorage.getItem("ical_url")||"";
