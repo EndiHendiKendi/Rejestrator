@@ -21,7 +21,7 @@ self.addEventListener('push', e => {
   const icon = ICONS[data.type] || '🔔';
 
   // Dla powiadomień o śmieciach — deep link do zakładki harmonogramu
-  const notifUrl = data.type === 'waste' ? '/?tab=harmonogram' : '/';
+  const notifUrl = data.type === 'waste' ? './?tab=harmonogram' : './';
 
   e.waitUntil(Promise.all([
     self.registration.showNotification(`${icon} ${data.title}`, {
@@ -29,8 +29,8 @@ self.addEventListener('push', e => {
       tag: data.type,
       renotify: true,
       requireInteraction: true,
-      icon: '/icon-192.png',
-      badge: '/badge.png',
+      icon: './icon-192.png',
+      badge: './badge.png',
       vibrate: [200, 100, 200],
       data: { url: notifUrl },
       actions: [
@@ -67,7 +67,7 @@ async function updateAppBadgeFromServer() {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
-  const targetUrl = (e.notification.data && e.notification.data.url) ? e.notification.data.url : '/';
+  const targetUrl = (e.notification.data && e.notification.data.url) ? e.notification.data.url : './';
   e.waitUntil(
     clients.matchAll({type:'window', includeUncontrolled:true}).then(list => {
       for (const c of list) {
