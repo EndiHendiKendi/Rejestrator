@@ -293,7 +293,25 @@ async function buildJWT(aud,pub,priv,email){
   const enc=o=>btoa(JSON.stringify(o)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
   const unsigned=`${enc({typ:'JWT',alg:'ES256'})}.${enc({aud,exp:now+43200,sub:email})}`;
   const hdr=new Uint8Array([0x30,0x41,0x02,0x01,0x00,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x04,0x27,0x30,0x25,0x02,0x01,0x01,0x04,0x20]);
-  const pk=new Uint8Array(hdr.length+32);pk.set(hdr);pk.set(fromb64u(priv).slice(-32),hdr.length);
+  // priv może być podany jako: (a) surowy 32-bajtowy scalar 'd' w base64url
+  // (to, czego oczekuje ten kod od dawna), albo (b) pełny klucz PKCS8 DER
+  // w base64url, jak zwracają niektóre generatory VAPID online. Rozpoznajemy
+  // PKCS8 po długości (>32 bajty) i po nagłówku zaczynającym się od 0x30
+  // (SEQUENCE) — wtedy scalar 'd' leży po znaczniku OCTET STRING 04 20.
+  const privRaw = fromb64u(priv);
+  let scalar;
+  if (privRaw.length === 32) {
+    scalar = privRaw;
+  } else {
+    // Szukaj sekwencji 04 20 (OCTET STRING, długość 32) — po niej leży scalar.
+    let idx = -1;
+    for (let i=0; i<privRaw.length-1; i++) {
+      if (privRaw[i]===0x04 && privRaw[i+1]===0x20 && i+34<=privRaw.length) { idx = i+2; break; }
+    }
+    if (idx===-1) throw new Error('VAPID_PRIVATE_KEY: nie rozpoznano formatu klucza (oczekiwano 32 bajtów albo PKCS8 z OCTET STRING)');
+    scalar = privRaw.slice(idx, idx+32);
+  }
+  const pk=new Uint8Array(hdr.length+32);pk.set(hdr);pk.set(scalar,hdr.length);
   const key=await crypto.subtle.importKey('pkcs8',pk.buffer,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
   const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,new TextEncoder().encode(unsigned));
   return `${unsigned}.${b64u(sig)}`;
