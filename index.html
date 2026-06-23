@@ -1716,7 +1716,9 @@ rzRefreshHistory();
 // ================================================================
 // iCal + PUSH
 // ================================================================
-var VAPID_PUB="BIdWnt6gT9XU6e9bB6Wp-7Z0f9Tbe4b6Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_2D7_8fO_6m5_3dE4B69Y5V8_wA";
+// WAŻNE: ten klucz musi być IDENTYCZNY jak VAPID_PUBLIC_KEY w Vercel Environment Variables.
+// Wygeneruj parę kluczy (npx web-push generate-vapid-keys) i wklej tu Public Key.
+var VAPID_PUB="WKLEJ_TUTAJ_NOWY_VAPID_PUBLIC_KEY";
 
 function getServer(){return localStorage.getItem("push_server")||"";}
 
