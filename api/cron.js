@@ -156,7 +156,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function getSub(kv) {
+export async function getSub(kv) {
   const raw = await kv.get('push_sub');
   if (!raw) return null;
   const parsed = typeof raw==='string'?JSON.parse(raw):raw;
@@ -318,7 +318,7 @@ async function encryptPayload(payload,sub){
   let o=0;out.set(salt,o);o+=16;out[o++]=(rs>>24)&0xff;out[o++]=(rs>>16)&0xff;out[o++]=(rs>>8)&0xff;out[o++]=rs&0xff;
   out[o++]=srvPub.length;out.set(srvPub,o);o+=srvPub.length;out.set(cipher,o);return out;
 }
-async function sendPush(sub,payload){
+export async function sendPush(sub,payload){
   const pub=process.env.VAPID_PUBLIC_KEY,priv=process.env.VAPID_PRIVATE_KEY,mail=process.env.VAPID_EMAIL||'mailto:admin@laluna.app';
   const url=new URL(sub.endpoint);
   const jwt=await buildJWT(`${url.protocol}//${url.host}`,pub,priv,mail);
