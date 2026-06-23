@@ -3,6 +3,7 @@
 // (bez wyciszania), żeby raz na zawsze potwierdzić czy push działa.
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   try {
     const { kv } = await import('@vercel/kv');
     const { getSub, sendPush } = await import('./cron.js');
