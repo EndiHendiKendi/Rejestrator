@@ -14,15 +14,19 @@ export default async function handler(req, res) {
     const now      = Date.now();
     if (icalUrl && (!lastSync || now - new Date(lastSync).getTime() > 24*3600000)) {
       try {
+        // Zapisz od razu — zapobiega ponownemu wysłaniu przy ponownym odpaleniu w tym samym dniu
+        await kv.set('ical_synced_at', new Date().toISOString());
         const txt = await (await fetch(icalUrl)).text();
         const events = parseIcal(txt);
         const stored = await kv.get('ical_events');
         const storedArr = stored ? (typeof stored==='string'?JSON.parse(stored):stored) : [];
         const storedUids = new Set(storedArr.map(e=>e.uid));
-        const newEvs = events.filter(e=>e.uid&&!storedUids.has(e.uid));
+        // Filtruj blokady kalendarza (CLOSED PERIOD, Not Available, Blocked itp.)
+        const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable/i;
+        const realEvs = events.filter(e => e.summary && !BLOCK_PATTERN.test(e.summary));
+        const newEvs = realEvs.filter(e=>e.uid&&!storedUids.has(e.uid));
         await kv.set('ical_events', JSON.stringify(events));
-        await kv.set('notif_schedule', JSON.stringify(buildSchedule(events, now)));
-        await kv.set('ical_synced_at', new Date().toISOString());
+        await kv.set('notif_schedule', JSON.stringify(buildSchedule(realEvs, now)));
         if (newEvs.length) {
           const sub = await getSub(kv);
           if (sub) for (const ev of newEvs)
