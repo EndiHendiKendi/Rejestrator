@@ -57,9 +57,11 @@ export default async function handler(req, res) {
     }
     await kv.set('notif_schedule', JSON.stringify(remaining));
 
-    // Monthly water meter — 25th at 09:00
+    // Monthly water meter — 25th at 09:00 (czas włoski)
     const d = new Date();
-    if (d.getDate()===25) {
+    const italyOffsetD = isItalyDST(d) ? 2 : 1;
+    const italyHourD = (d.getUTCHours() + italyOffsetD) % 24;
+    if (d.getDate()===25 && italyHourD===9) {
       const mk = `meter_${d.getFullYear()}_${d.getMonth()}`;
       if (!await kv.get(mk)) {
         const entry={type:'licznik',title:'\uD83D\uDCA7 Licznik wody',body:'Odczytaj licznik wody \u2014 25. dzie\u0144 miesi\u0105ca.'};
@@ -69,8 +71,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Tax — 15 May at 09:00
-    if (d.getMonth()===4 && d.getDate()===15) {
+    // Tax — 15 May at 09:00 (czas włoski)
+    if (d.getMonth()===4 && d.getDate()===15 && italyHourD===9) {
       const tk = `tax_${d.getFullYear()}`;
       if (!await kv.get(tk)) {
         const entry={type:'podatek',title:'\uD83D\uDCCB Zeznanie podatkowe',body:'Zeznanie podatkowe \u2014 pliki CU'};
@@ -129,8 +131,8 @@ export default async function handler(req, res) {
     }
 
     
-    // IMU — 1 czerwca (rata 1)
-    if (d.getMonth()===5 && d.getDate()===1) {
+    // IMU — 1 czerwca (rata 1) at 09:00 (czas włoski)
+    if (d.getMonth()===5 && d.getDate()===1 && italyHourD===9) {
       const imu1k = `imu1_${d.getFullYear()}`;
       if (!await kv.get(imu1k)) {
         const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (1 rata)'};
@@ -139,8 +141,8 @@ export default async function handler(req, res) {
         await kv.set(imu1k,'1'); fired.push('imu1');
       }
     }
-    // IMU — 1 grudnia (rata 2)
-    if (d.getMonth()===11 && d.getDate()===1) {
+    // IMU — 1 grudnia (rata 2) at 09:00 (czas włoski)
+    if (d.getMonth()===11 && d.getDate()===1 && italyHourD===9) {
       const imu2k = `imu2_${d.getFullYear()}`;
       if (!await kv.get(imu2k)) {
         const entry={type:'imu',title:'\uD83C\uDFE0 IMU',body:'IMU z\u0142o\u017cy\u0107 deklaracj\u0119 i op\u0142aci\u0107 (2 rata)'};
@@ -230,9 +232,12 @@ function buildSchedule(events, now) {
       body:'Przestaw pomp\u0119, ledy i podgrzewacz.'});
 
     // +2 days after checkout 18:00 (czas włoski) — Rozliczenie
+    // WAŻNE: dodajemy do harmonogramu TYLKO jeśli checkout jeszcze nie minął.
+    // Dzięki temu reset harmonogramu nie wystrzeluje starych rozliczeń.
     const h4base = new Date(ev.end); h4base.setUTCDate(h4base.getUTCDate()+2);
     const h4 = italyLocalToUTC(h4base, 18);
-    if (h4.getTime()>now) sched.push({type:'rozliczenie',fireAt:h4.getTime(),uid:ev.uid,
+    const checkoutTime = new Date(ev.end).getTime();
+    if (h4.getTime()>now && checkoutTime>now) sched.push({type:'rozliczenie',fireAt:h4.getTime(),uid:ev.uid,
       title:'\uD83D\uDCB0 Czas na rozliczenie!',
       body:`Go\u015bcie wyjechali 2 dni temu. Otw\u00F3rz zak\u0142adk\u0119 Margherita.`});
   }
