@@ -2014,11 +2014,17 @@ function rezRender(){
     if(c) rezData=JSON.parse(c);
   }catch(e){}
 
-  // Deduplikacja — ten sam uid lub te same daty startowe = usuń duplikat
-  var _seen={}; var _dedupedRez=[];
-  rezData.forEach(function(ev,i){
-    var key=ev.uid||(ev.start||'').slice(0,10)+'_'+(ev.end||'').slice(0,10);
-    if(!_seen[key]){_seen[key]=true;_dedupedRez.push(ev);}
+  // Deduplikacja — te same daty start+end = duplikat (priorytet: wpis z iCal uid nad lokalnym)
+  var _seenDates={}; var _dedupedRez=[];
+  // Sortuj: wpisy z iCal uid (bez prefixu ocr_/manual_/csv_) idą pierwsze
+  var _sorted=rezData.slice().sort(function(a,b){
+    var aLocal=a.uid&&(a.uid.indexOf('ocr_')===0||a.uid.indexOf('manual_')===0||a.uid.indexOf('csv_')===0)?1:0;
+    var bLocal=b.uid&&(b.uid.indexOf('ocr_')===0||b.uid.indexOf('manual_')===0||b.uid.indexOf('csv_')===0)?1:0;
+    return aLocal-bLocal;
+  });
+  _sorted.forEach(function(ev){
+    var dateKey=(ev.start||'').slice(0,10)+'_'+(ev.end||'').slice(0,10);
+    if(!_seenDates[dateKey]){_seenDates[dateKey]=true;_dedupedRez.push(ev);}
   });
   rezData=_dedupedRez;
   try{localStorage.setItem("rez_cache",JSON.stringify(rezData));}catch(e){}
