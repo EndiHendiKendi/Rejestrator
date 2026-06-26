@@ -1984,12 +1984,16 @@ function rezSync(){
         }
         return ev;
       });
-      // Dodaj lokalne wpisy OCR których nie ma w incoming (uid zaczyna się od 'ocr_')
+      // Dodaj lokalne wpisy OCR/manual/csv których nie ma w incoming (nie są z iCal)
+      var incomingUids=new Set(incoming.map(function(e){return e.uid;}));
       local.forEach(function(ev){
-        if(ev.uid&&ev.uid.indexOf('ocr_')===0){
+        var isLocal=ev.uid&&(ev.uid.indexOf('ocr_')===0||ev.uid.indexOf('manual_')===0||ev.uid.indexOf('csv_')===0);
+        if(isLocal){
           var exists=merged.some(function(m){return m.uid===ev.uid;});
           if(!exists)merged.push(ev);
         }
+        // wpisy z iCal które znikły z incoming (anulowane) są automatycznie usunięte
+        // bo merged jest budowane tylko z incoming
       });
       rezData=merged;
       localStorage.setItem("rez_cache",JSON.stringify(rezData));
@@ -2009,6 +2013,15 @@ function rezRender(){
     var c=localStorage.getItem("rez_cache");
     if(c) rezData=JSON.parse(c);
   }catch(e){}
+
+  // Deduplikacja — ten sam uid lub te same daty startowe = usuń duplikat
+  var _seen={}; var _dedupedRez=[];
+  rezData.forEach(function(ev,i){
+    var key=ev.uid||(ev.start||'').slice(0,10)+'_'+(ev.end||'').slice(0,10);
+    if(!_seen[key]){_seen[key]=true;_dedupedRez.push(ev);}
+  });
+  rezData=_dedupedRez;
+  try{localStorage.setItem("rez_cache",JSON.stringify(rezData));}catch(e){}
 
   var _today=new Date();_today.setHours(0,0,0,0);
   var _rezFiltered=[];
@@ -2036,7 +2049,7 @@ function rezRender(){
   if(wrap)wrap.style.display="block";
   var el=document.getElementById("rezTableEl");if(!el)return;
   var th="<thead><tr style='background:rgba(201,169,110,.12);'>";
-  ["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz."].forEach(function(col){
+  ["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz.",""].forEach(function(col){
     th+='<th style="padding:10px 8px;text-align:left;color:var(--gold2);font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid rgba(201,169,110,.2);">'+col+'</th>';
   });
   th+="</tr></thead>";
@@ -2062,10 +2075,19 @@ function rezRender(){
       +'<td style="padding:9px 8px;color:var(--text3);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="rezEditField('+realIdx+',\'country\')">'+country+'</td>'
       +'<td style="padding:9px 8px;text-align:center;color:var(--blue);font-weight:700;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="rezEditField('+realIdx+',\'adults\')">'+adults+'</td>'
       +'<td style="padding:9px 8px;text-align:center;color:var(--text3);font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="rezEditField('+realIdx+',\'children\')">'+kids+'</td>'
+      +'<td style="padding:6px 4px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04);"><button onclick="rezDelete('+realIdx+')" style="background:none;border:none;cursor:pointer;font-size:15px;opacity:.5;" title="Usuń">🗑️</button></td>'
       +'</tr>';
   });
   tb+="</tbody>";
   el.innerHTML=th+tb;
+}
+
+function rezDelete(realIdx){
+  if(!confirm("Usuń tę rezerwację z listy?"))return;
+  try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+  rezData.splice(realIdx,1);
+  localStorage.setItem("rez_cache",JSON.stringify(rezData));
+  rezRender();
 }
 
 function rezEdit(realIdx){
