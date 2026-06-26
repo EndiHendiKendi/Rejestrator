@@ -24,7 +24,10 @@ export default async function handler(req, res) {
         // Filtruj blokady kalendarza (CLOSED PERIOD, Not Available, Blocked itp.)
         const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable/i;
         const realEvs = events.filter(e => e.summary && !BLOCK_PATTERN.test(e.summary));
-        const newEvs = realEvs.filter(e=>e.uid&&!storedUids.has(e.uid));
+        // Tylko rezerwacje których check-in jest w przyszłości (max 1 dzień wstecz tolerancji)
+        // Zabezpieczenie przed wysyłaniem "nowych" rezerwacji po resecie KV storage
+        const oneDayAgo = now - 86400000;
+        const newEvs = realEvs.filter(e=>e.uid&&!storedUids.has(e.uid)&&new Date(e.start).getTime()>=oneDayAgo);
         await kv.set('ical_events', JSON.stringify(events));
         await kv.set('notif_schedule', JSON.stringify(buildSchedule(realEvs, now)));
         if (newEvs.length) {
