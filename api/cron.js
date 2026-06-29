@@ -18,19 +18,40 @@ export default async function handler(req, res) {
         await kv.set('ical_synced_at', new Date().toISOString());
         const txt = await (await fetch(icalUrl)).text();
         const events = parseIcal(txt);
-        const stored = await kv.get('ical_events');
-        const storedArr = stored ? (typeof stored==='string'?JSON.parse(stored):stored) : [];
-        const storedUids = new Set(storedArr.map(e=>e.uid));
         // Filtruj blokady kalendarza (CLOSED PERIOD, Not Available, Blocked itp.)
         const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable/i;
         const realEvs = events.filter(e => e.summary && !BLOCK_PATTERN.test(e.summary));
-        // Tylko rezerwacje których check-in jest w przyszłości (max 1 dzień wstecz tolerancji)
-        // Zabezpieczenie przed wysyłaniem "nowych" rezerwacji po resecie KV storage
-        const oneDayAgo = now - 86400000;
-        const newEvs = realEvs.filter(e=>e.uid&&!storedUids.has(e.uid)&&new Date(e.start).getTime()>=oneDayAgo);
+
+        // sent_uids: lista uid dla których już wysłano powiadomienie.
+        // Aktualizowana addytywnie — nigdy nie kasowana, przeżywa resety KV lepiej
+        // bo jest osobnym kluczem i nadpisywana tylko przy nowych rezerwacjach.
+        // Dodatkowo: diff z poprzednim snapshotem iCal jako drugi mechanizm.
+        const prevRaw = await kv.get('ical_events');
+        const prevArr = prevRaw ? (typeof prevRaw==='string'?JSON.parse(prevRaw):prevRaw) : [];
+        const prevUids = new Set(prevArr.map(e=>e.uid));
+
+        const sentRaw = await kv.get('sent_uids');
+        const sentArr = sentRaw ? (typeof sentRaw==='string'?JSON.parse(sentRaw):sentRaw) : [];
+        const sentUids = new Set(sentArr);
+
+        // Nowa = nie ma w ŻADNYM z dwóch źródeł (prev snapshot LUB sent_uids)
+        // + check-in dziś lub w przyszłości (zabezpieczenie gdy oba źródła padną)
+        const todayMidnight = new Date(now); todayMidnight.setUTCHours(0,0,0,0);
+        const newEvs = realEvs.filter(e =>
+          e.uid &&
+          !prevUids.has(e.uid) &&
+          !sentUids.has(e.uid) &&
+          new Date(e.start).getTime() >= todayMidnight.getTime()
+        );
+
         await kv.set('ical_events', JSON.stringify(events));
         await kv.set('notif_schedule', JSON.stringify(buildSchedule(realEvs, now)));
+
         if (newEvs.length) {
+          // Zapisz nowe uid do sent_uids (appenduj, nie kasuj starych)
+          const allSent = [...new Set([...sentArr, ...newEvs.map(e=>e.uid)])];
+          // Zachowaj max 500 uid żeby klucz nie rósł bez końca
+          await kv.set('sent_uids', JSON.stringify(allSent.slice(-500)));
           const sub = await getSub(kv);
           if (sub) for (const ev of newEvs)
             await sendPush(sub, { type:'new_booking', title:'\uD83D\uDCC5 Nowa rezerwacja! \u2014 Margherita', body:`${ev.summary||'Nowy go\u015b\u0107'} \u2014 wy\u015blij tabel\u0119 Marghericie!` }).catch(e=>console.error('sendPush failed:', e.message));
