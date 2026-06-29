@@ -22,25 +22,30 @@ export default async function handler(req, res) {
         const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable/i;
         const realEvs = events.filter(e => e.summary && !BLOCK_PATTERN.test(e.summary));
 
-        // sent_uids: lista uid dla których już wysłano powiadomienie.
-        // Aktualizowana addytywnie — nigdy nie kasowana, przeżywa resety KV lepiej
-        // bo jest osobnym kluczem i nadpisywana tylko przy nowych rezerwacjach.
-        // Dodatkowo: diff z poprzednim snapshotem iCal jako drugi mechanizm.
+        // Pobierz poprzedni snapshot iCal
         const prevRaw = await kv.get('ical_events');
         const prevArr = prevRaw ? (typeof prevRaw==='string'?JSON.parse(prevRaw):prevRaw) : [];
-        const prevUids = new Set(prevArr.map(e=>e.uid));
 
-        const sentRaw = await kv.get('sent_uids');
+        // Klucz "widzianych" rezerwacji = start_end (daty zameldowania i wymeldowania)
+        // To najpewniejszy identyfikator — uid może się zmienić przy modyfikacji w Airbnb/Booking,
+        // ale daty pobytu zostają. Jeśli coś ma te same daty = ta sama rezerwacja, brak powiadomienia.
+        const dateKey = e => (e.start||'').slice(0,10)+'|'+(e.end||'').slice(0,10);
+        const prevDateKeys = new Set(prevArr.map(dateKey));
+
+        // sent_keys: addytywna lista kluczy start|end dla których już wysłano powiadomienie.
+        // Osobny klucz w KV — przeżywa reset ical_events.
+        const sentRaw = await kv.get('sent_keys');
         const sentArr = sentRaw ? (typeof sentRaw==='string'?JSON.parse(sentRaw):sentRaw) : [];
-        const sentUids = new Set(sentArr);
+        const sentKeys = new Set(sentArr);
 
-        // Nowa = nie ma w ŻADNYM z dwóch źródeł (prev snapshot LUB sent_uids)
-        // + check-in dziś lub w przyszłości (zabezpieczenie gdy oba źródła padną)
+        // Nowa rezerwacja = jej daty nie były w poprzednim snapshoci iCal
+        // ORAZ nie była już wcześniej notyfikowana (sent_keys)
+        // ORAZ check-in dziś lub w przyszłości (ostatnia deska ratunku gdy KV całkowicie padnie)
         const todayMidnight = new Date(now); todayMidnight.setUTCHours(0,0,0,0);
         const newEvs = realEvs.filter(e =>
-          e.uid &&
-          !prevUids.has(e.uid) &&
-          !sentUids.has(e.uid) &&
+          e.start &&
+          !prevDateKeys.has(dateKey(e)) &&
+          !sentKeys.has(dateKey(e)) &&
           new Date(e.start).getTime() >= todayMidnight.getTime()
         );
 
@@ -48,10 +53,9 @@ export default async function handler(req, res) {
         await kv.set('notif_schedule', JSON.stringify(buildSchedule(realEvs, now)));
 
         if (newEvs.length) {
-          // Zapisz nowe uid do sent_uids (appenduj, nie kasuj starych)
-          const allSent = [...new Set([...sentArr, ...newEvs.map(e=>e.uid)])];
-          // Zachowaj max 500 uid żeby klucz nie rósł bez końca
-          await kv.set('sent_uids', JSON.stringify(allSent.slice(-500)));
+          // Appenduj nowe klucze do sent_keys (nigdy nie kasuj, max 500 wpisów)
+          const allSent = [...new Set([...sentArr, ...newEvs.map(dateKey)])];
+          await kv.set('sent_keys', JSON.stringify(allSent.slice(-500)));
           const sub = await getSub(kv);
           if (sub) for (const ev of newEvs)
             await sendPush(sub, { type:'new_booking', title:'\uD83D\uDCC5 Nowa rezerwacja! \u2014 Margherita', body:`${ev.summary||'Nowy go\u015b\u0107'} \u2014 wy\u015blij tabel\u0119 Marghericie!` }).catch(e=>console.error('sendPush failed:', e.message));
