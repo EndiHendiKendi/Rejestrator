@@ -1,4 +1,6 @@
 // POST /api/ical-sync  { icalUrl }
+import { buildSchedule } from './cron.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,36 +16,19 @@ export default async function handler(req, res) {
     const events = parseIcal(text);
     const now = Date.now();
 
-    const schedule = [];
-    for (const ev of events) {
-      const start = new Date(ev.start).getTime();
-      const end   = new Date(ev.end).getTime();
-      if (isNaN(start)||isNaN(end)) continue;
-
-      // Check-in day 17:00
-      const ci = new Date(ev.start); ci.setHours(17,0,0,0);
-      if (ci.getTime() > now) schedule.push({ type:'checkin', fireAt:ci.getTime(), uid:ev.uid,
-        title:'🏠 Zameldowanie dzisiaj!',
-        body:`${ev.summary||'Goście'} przyjeżdżają dziś. Przygotuj dom i klucze.` });
-
-      // Check-in day 10:00 — harmonogram
-      const hi = new Date(ev.start); hi.setHours(10,0,0,0);
-      if (hi.getTime() > now) schedule.push({ type:'harmonogram_in', fireAt:hi.getTime(), uid:ev.uid,
-        title:'💡 Harmonogram + ciepła woda',
-        body:`Dziś przyjeżdżają ${ev.summary||'goście'}. Ustaw pompę, ledy i podgrzewacz.` });
-
-      // Check-out day 10:00 — harmonogram
-      const ho = new Date(ev.end); ho.setHours(10,0,0,0);
-      if (ho.getTime() > now) schedule.push({ type:'harmonogram_out', fireAt:ho.getTime(), uid:ev.uid,
-        title:'💡 Harmonogram + ciepła woda',
-        body:`Dziś wyjeżdżają ${ev.summary||'goście'}. Przestaw pompę, ledy i podgrzewacz.` });
-
-      // Rozliczenie +2 days at 18:00
-      const st = new Date(ev.end); st.setDate(st.getDate()+2); st.setHours(18,0,0,0);
-      if (st.getTime() > now) schedule.push({ type:'rozliczenie', fireAt:st.getTime(), uid:ev.uid,
-        title:'💰 Czas na rozliczenie!',
-        body:`Goście ${ev.summary||''} wyjechali 2 dni temu. Otwórz zakładkę Rozlicz.` });
-    }
+    // WAŻNE: harmonogram budujemy DOKŁADNIE tą samą funkcją co api/cron.js
+    // (buildSchedule — liczy godziny w czasie włoskim przez italyLocalToUTC).
+    // Wcześniej ten plik miał własną, osobną wersję liczącą godziny w
+    // "lokalnym" czasie serwera (czyli UTC na Vercelu) — to przesuwało
+    // godziny o 1-2h, a przy odświeżeniu/zmianie linku iCal z apki
+    // (przyciski w Ustawieniach) CAŁKOWICIE nadpisywało poprawny
+    // harmonogram zbudowany wcześniej przez cron.js tym przesuniętym.
+    // Jeśli przesunięta godzina "rozliczenia" (checkout+2dni 18:00)
+    // wypadła w przeszłości względem `now` w momencie przeliczania —
+    // wpis nigdy nie trafiał do harmonogramu i powiadomienie ginęło
+    // bezpowrotnie. To był realny powód niewysłanego przypomnienia
+    // o rozliczeniu z Margheritą.
+    const schedule = buildSchedule(events, now);
 
     const { kv } = await import('@vercel/kv');
     await kv.set('ical_url', icalUrl);

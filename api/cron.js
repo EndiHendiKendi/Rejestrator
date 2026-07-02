@@ -234,7 +234,7 @@ async function sendReminders(kv, sub) {
   } catch(e) { console.error('sendReminders:', e.message); }
 }
 
-function buildSchedule(events, now) {
+export function buildSchedule(events, now) {
   const sched = [];
   for (const ev of events) {
     const start = new Date(ev.start).getTime();
