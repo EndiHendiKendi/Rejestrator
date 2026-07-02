@@ -264,8 +264,8 @@ function buildSchedule(events, now) {
     // Dzięki temu reset harmonogramu nie wystrzeluje starych rozliczeń.
     const h4base = new Date(ev.end); h4base.setUTCDate(h4base.getUTCDate()+2);
     const h4 = italyLocalToUTC(h4base, 18);
-    const checkoutTime = new Date(ev.end).getTime();
-    if (h4.getTime()>now && checkoutTime>now) sched.push({type:'rozliczenie',fireAt:h4.getTime(),uid:ev.uid,
+    // Warunek: tylko h4 w przyszłości. Checkout może być w przeszłości (to normalne).
+    if (h4.getTime()>now) sched.push({type:'rozliczenie',fireAt:h4.getTime(),uid:ev.uid,
       title:'\uD83D\uDCB0 Czas na rozliczenie!',
       body:`Go\u015bcie wyjechali 2 dni temu. Otw\u00F3rz zak\u0142adk\u0119 Margherita.`});
   }
