@@ -1542,7 +1542,16 @@ var RZ_SEED = {
 };
 
 function rzLoad(){
-  try{var d=JSON.parse(localStorage.getItem(RZ_KEY));if(d)return d;}catch(e){}
+  try{
+    var d=JSON.parse(localStorage.getItem(RZ_KEY));
+    if(d){
+      // Napraw ewentualny "śmieć" z błędów zaokrąglania float (np. 360.21000000000004)
+      // z wcześniej zapisanych danych — czyste dane od teraz i tak zawsze wychodzą równe.
+      if(typeof d.saldo==="number")d.saldo=Math.round((d.saldo+Number.EPSILON)*100)/100;
+      if(Array.isArray(d.entries))d.entries.forEach(function(e){if(typeof e.saltoAfter==="number")e.saltoAfter=Math.round((e.saltoAfter+Number.EPSILON)*100)/100;});
+      return d;
+    }
+  }catch(e){}
   if(new Date().getFullYear()===2026){var s=JSON.parse(JSON.stringify(RZ_SEED));rzSave(s);return s;}
   return {entries:[],saldo:0};
 }
@@ -1624,6 +1633,8 @@ document.getElementById("btnRzAddExtra").addEventListener("click",function(){
   rzRenderExtras();
 });
 
+function r2(x){return Math.round((x+Number.EPSILON)*100)/100;}
+
 function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
   var lines=[],p="\u200B👤";
   groups.forEach(function(gr){
@@ -1663,7 +1674,7 @@ function rzDeleteEntry(i){
   data.entries.splice(i,1);
   // Subtract delta from all subsequent entries
   for(var j=i;j<data.entries.length;j++){
-    data.entries[j].saltoAfter-=delta;
+    data.entries[j].saltoAfter=r2(data.entries[j].saltoAfter-delta);
   }
   data.saldo=data.entries.length?data.entries[data.entries.length-1].saltoAfter:0;
   rzSave(data);
@@ -1733,9 +1744,25 @@ function rzCommit(){
   var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
   if(!lines.length){alert("Dodaj grupy gości lub inne pozycje");return false;}
   var data=rzLoad();
-  var delta=rzCalcDelta(rzGroups,rzExtras,cleaning,ph,usePC,pca);
-  data.saldo+=delta;
-  data.entries.push({lines:lines,saltoAfter:data.saldo,ts:Date.now()});
+
+  // Goście i "Inne" trafiają jako OSOBNE wpisy (nawet jeśli dodane w tym
+  // samym zapisie) — dzięki temu w historii widać je jako dwa oddzielne
+  // bloki (dokładnie tak jak wcześniej wyglądały niezależne wpisy), a nie
+  // jeden zlepiony wpis. Renderowanie (rzRefreshHistory) i tak łączy
+  // sąsiadujące wpisy "tylko Inne" wizualnie pod spodem, więc efekt jest
+  // czytelny: karta gościa, a pod nią doklejone "Inne".
+  if(rzGroups.length){
+    var groupLines=rzBuildLines(rzGroups,[],cleaning,ph,usePC,pca);
+    var groupDelta=rzCalcDelta(rzGroups,[],cleaning,ph,usePC,pca);
+    data.saldo=r2(data.saldo+groupDelta);
+    data.entries.push({lines:groupLines,saltoAfter:data.saldo,ts:Date.now()});
+  }
+  if(rzExtras.length){
+    var extraLines=rzBuildLines([],rzExtras,false,0,false,0);
+    var extraDelta=rzCalcDelta([],rzExtras,false,0,false,0);
+    data.saldo=r2(data.saldo+extraDelta);
+    data.entries.push({lines:extraLines,saltoAfter:data.saldo,ts:Date.now()});
+  }
   rzSave(data);
   // Save to guest history
   var _hist=JSON.parse(localStorage.getItem("guest_history")||"[]");
