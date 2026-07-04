@@ -993,7 +993,7 @@ function parseNumberedMultilineFormat(allLines, sharedNat, gtype){
     var birthN=normC(countries[1]||cit)||citN;
     var residN=normC(countries[2]||cit)||citN;
     var isLeader=(bi===0);
-    guests.push({id:uid(),firstName:san(fn),lastName:san(ln),rawFirst:fn,rawLast:ln,
+    guests.push({id:uid(),firstName:sanName(fn),lastName:sanName(ln),rawFirst:fn,rawLast:ln,
       gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),
       isLeader:isLeader,gtype:gtype,docType:docType,docNumber:docNumber,
       role:isLeader?"Capogruppo":"Membro"});
@@ -1023,7 +1023,7 @@ function txRunHeuristic(text,gtype){
         if(!p.fn && !p.ln) continue;
         var citN = sharedNat || normC(normNatWord(p.cit)) || "";
         var isFirst = (guests.length===0);
-        guests.push({id:uid(),firstName:san(p.fn),lastName:san(p.ln),rawFirst:p.fn,rawLast:p.ln,gender:p.gender,dob:p.dob,cit:citN,birthC:citN,residC:citN,isItaly:isIT(citN||p.cit),isLeader:isFirst,gtype:gtype,docType:"",docNumber:"",role:isFirst?"Capogruppo":"Membro"});
+        guests.push({id:uid(),firstName:sanName(p.fn),lastName:sanName(p.ln),rawFirst:p.fn,rawLast:p.ln,gender:p.gender,dob:p.dob,cit:citN,birthC:citN,residC:citN,isItaly:isIT(citN||p.cit),isLeader:isFirst,gtype:gtype,docType:"",docNumber:"",role:isFirst?"Capogruppo":"Membro"});
       }
     } else {
       var blocks=text.split(/\n[ \t]*\n+/).map(function(b){return b.trim();}).filter(Boolean);
@@ -1047,7 +1047,7 @@ function txRunHeuristic(text,gtype){
         var citN=normC(cit)||sharedNat||"";
         var birthN=normC(countries[1]||cit)||citN;
         var residN=normC(countries[2]||cit)||citN;
-        guests.push({id:uid(),firstName:san(fn),lastName:san(ln),rawFirst:fn,rawLast:ln,gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),isLeader:isLeader,gtype:gtype,docType:"",docNumber:"",role:isLeader?"Capogruppo":"Membro"});
+        guests.push({id:uid(),firstName:sanName(fn),lastName:sanName(ln),rawFirst:fn,rawLast:ln,gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),isLeader:isLeader,gtype:gtype,docType:"",docNumber:"",role:isLeader?"Capogruppo":"Membro"});
       }
     }
   }
@@ -1066,7 +1066,7 @@ function txRunAI(text,gtype,onDone){
   txSetStatus("🤖 Analizuję inteligentnie...");
   var prompt="Extract every guest from this raw, possibly messy pasted text (may be numbered, wrapped inconsistently across lines, in any language, any order of fields). Return ONLY a raw JSON array, no markdown, no extra text. One element per distinct person, preserve original order, never skip a person even if some fields are missing:\n"+
     "{\"firstName\":\"given name(s)\",\"lastName\":\"surname\",\"gender\":\"M or F or empty string\",\"dateOfBirth\":\"DD/MM/YYYY or empty string\",\"nationality\":\"standard English country name (e.g. Poland, Germany, Italy), empty if unknown\",\"birthCountry\":\"empty string if same as nationality\",\"residenceCountry\":\"empty string if same as nationality\",\"docType\":\"PASSAPORTO or CARTA D'IDENTITA or PATENTE or empty string\",\"docNumber\":\"exact document/ID number if present, else empty string\",\"isLeader\":true only for the group leader/first person if the text marks one, otherwise false}\n"+
-    "Never invent data that isn't in the text — leave fields empty instead of guessing. Numbering prefixes like \"1:\" or \"2.\" are NOT part of the name — strip them.\n\nTEXT:\n"+text.slice(0,10000);
+    "Never invent data that isn't in the text — leave fields empty instead of guessing. Numbering prefixes like \"1:\" or \"2.\" are NOT part of the name — strip them. Replace ALL hyphens in names with a space (e.g. \"Kowalska-Nowak\" -> \"Kowalska Nowak\").\n\nTEXT:\n"+text.slice(0,10000);
   fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:4000,temperature:0}})
@@ -1086,7 +1086,7 @@ function txRunAI(text,gtype,onDone){
       var birthN=p.birthCountry?normC(normNatWord(p.birthCountry)):citN;
       var residN=p.residenceCountry?normC(normNatWord(p.residenceCountry)):citN;
       var isLeader=!!p.isLeader||(i===0&&!persons.some(function(x){return x.isLeader;}));
-      guests.push({id:uid(),firstName:san(p.firstName||""),lastName:san(p.lastName||""),
+      guests.push({id:uid(),firstName:sanName(p.firstName||""),lastName:sanName(p.lastName||""),
         rawFirst:p.firstName||"",rawLast:p.lastName||"",
         gender:(p.gender==="M"||p.gender==="F")?p.gender:null,dob:p.dateOfBirth||"",
         cit:citN,birthC:birthN,residC:residN,isItaly:isIT(citN),
