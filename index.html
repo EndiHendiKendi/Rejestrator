@@ -1231,9 +1231,7 @@ function runOcr(file,onDone){
       // Remaining persons go into a synthetic queue processed after user saves this one
       if(persons.length>1){
         var remaining=persons.slice(1);
-        remaining.forEach(function(pp){
-          ocrQueue.unshift({_synthetic:true,_data:pp});
-        });
+        Array.prototype.unshift.apply(ocrQueue, remaining.map(function(pp){return {_synthetic:true,_data:pp};}));
         document.getElementById("ocrErr").style.display="block";
         document.getElementById("ocrErr").style.background="rgba(201,169,110,0.15)";
         document.getElementById("ocrErr").style.color="var(--gold2)";
@@ -1264,23 +1262,24 @@ function refreshOcrBtns(){
 }
 
 function applyOcrAll(){
-  // Approve current form
-  applyOcr(null);
-  // Then auto-approve all remaining in queue
-  function approveNext(){
-    if(!ocrQueue.length)return;
-    // processOcrQueue fills the form, then we approve
-    processOcrQueue();
-    // Wait for synthetic fill (instant) or real OCR to complete
+  function step(){
+    // applyOcr() zatwierdza aktualnie wyświetloną osobę i SAMO, wewnętrznie,
+    // uruchamia processOcrQueue() jeśli w kolejce coś zostało — to jedyne
+    // miejsce, które przesuwa kolejkę. Wcześniej ta funkcja wywoływała
+    // processOcrQueue() jeszcze raz na dodatek, co przy kilku osobach z
+    // TEGO SAMEGO zdjęcia (przetwarzanych błyskawicznie, bez opóźnienia
+    // sieciowego) potrafiło nadpisać dane kolejnej osoby, zanim zdążyła
+    // zostać zapisana — stąd "nie zczytało wielu dokumentów".
+    applyOcr(null);
     var check=setInterval(function(){
-      if(!ocrProcessing&&document.getElementById("ocrResult").style.display!=="none"){
-        clearInterval(check);
-        applyOcr(null);
-        approveNext();
-      }
+      if(ocrProcessing)return; // wciąż analizuje prawdziwe zdjęcie — czekaj
+      clearInterval(check);
+      var resultShown = document.getElementById("ocrResult").style.display!=="none";
+      if(resultShown) step(); // kolejna osoba czeka gotowa na formularzu — zatwierdź i ją
+      // w przeciwnym razie: kolejka pusta, koniec
     },100);
   }
-  approveNext();
+  step();
 }
 
 document.getElementById("btnOcrAll").addEventListener("click",function(){applyOcrAll();});
@@ -1315,8 +1314,8 @@ function applyOcr(guestId){
     birthC:birthC,
     residC:resC,
     isItaly:isIT(nat),
-    docType:isLeaderVal ? document.getElementById("oDocType").value : "",
-    docNumber:isLeaderVal ? san(document.getElementById("oDocNum").value) : ""
+    docType:document.getElementById("oDocType").value,
+    docNumber:san(document.getElementById("oDocNum").value)
   };
   
   if(targetId){
