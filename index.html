@@ -1490,8 +1490,14 @@ function genTXT(){
   var pfx=san(STRUCT.code).replace(/[^A-Z0-9]/g,"").slice(0,4);
   while(pfx.length<4)pfx+="0";
   function tipo(g,tot){if(tot===1)return"16";if(g.isLeader)return g.gtype==="famiglia"?"17":"18";return g.gtype==="famiglia"?"19":"20";}
-  return guests.map(function(g,i){
-    var tot=guests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
+  // WAŻNE: capogruppo/capofamiglia MUSI być fizycznie pierwszym wierszem w
+  // pliku — inaczej Ross1000/Questura odrzuca cały plik błędem "non è stata
+  // rispettata la sequenza". Kolejność na liście gości w apce może być
+  // dowolna (np. po zmianie Capogruppo), więc tu sortujemy tylko na czas
+  // generowania pliku, bez ruszania kolejności w samej apce.
+  var orderedGuests=guests.slice().sort(function(a,b){return (b.isLeader?1:0)-(a.isLeader?1:0);});
+  return orderedGuests.map(function(g,i){
+    var tot=orderedGuests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
     var ncC=getNC(g.cit),ncB=getNC(g.birthC||g.cit),ncR=getNC(g.residC||g.cit);
     return pp(t,2)+pp(arr,10)+pp(san(g.lastName),50)+pp(san(g.firstName),30)+(g.gender==="F"?"2":"1")+pp(g.dob,10)+pp("",9)+pp(g.isItaly?"  ":"EE",2)+pp(ncB,9,true)+pp(ncC,9,true)+pp("",9)+pp("",2)+pp(ncR,9,true)+pp("",50)+(head?pp(DC[g.docType]||"",5):pp("",5))+(head?pp(san(g.docNumber||""),20):pp("",20))+pp("",9)+pp(dep,10)+pp("Non Specificato",30)+pp("Non Specificato",30)+(head?String(Number(camOcc)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.camDisp)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.lettiDisp)||2).padStart(4,"0"):pp("",4))+"0"+pp(pfx+String(i+1).padStart(6,"0"),10)+"1";
   }).join("\r\n");
@@ -1524,8 +1530,10 @@ function genQuestura(){
   function pq(v,len){var s=String(v||"").slice(0,len);while(s.length<len)s=s+" ";return s;}
   function pqn(v,len){var s=String(Number(v)||0);while(s.length<len)s="0"+s;return s.slice(0,len);}
   function tipo(g,tot){if(tot===1)return"16";if(g.isLeader)return g.gtype==="famiglia"?"17":"18";return g.gtype==="famiglia"?"19":"20";}
-  var rows=guests.map(function(g,idx){
-    var tot=guests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
+  // Capogruppo musi być pierwszym wierszem pliku — patrz komentarz w genTXT().
+  var orderedGuests=guests.slice().sort(function(a,b){return (b.isLeader?1:0)-(a.isLeader?1:0);});
+  var rows=orderedGuests.map(function(g,idx){
+    var tot=orderedGuests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
     var birthCtry=g.birthC||g.cit;
     var ncBirth=getNC(birthCtry);  // 9-digit ISTAT e.g. "100000100"
     var ncCit=getNC(g.cit);
