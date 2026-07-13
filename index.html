@@ -2470,7 +2470,7 @@ document.getElementById("btnRzHistory").addEventListener("click",function(){
     var b=document.createElement("button");
     b.style.cssText="width:100%;text-align:left;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text);font-size:14px;cursor:pointer;";
     b.textContent=name;
-    b.onclick=function(){rzGroups.push({name:name,count:1});pk.style.display="none";rzRenderGroups();};
+    b.onclick=function(){var firstName=name.trim().split(/\s+/)[0];rzGroups.push({name:firstName,count:1});pk.style.display="none";rzRenderGroups();};
     pk.appendChild(b);
   });
   pk.style.display="block";
