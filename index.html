@@ -550,7 +550,7 @@ select.inp{cursor:pointer;}
 <div class="screen" id="s-rezerwacje">
   <div class="topbar">
     <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Sezon 2026</div></div>
-    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button id="btnRezSync" onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
+    <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezStatsOpen()" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:#a78bfa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📊 Statystyki</button><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button id="btnRezSync" onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
   </div>
   <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
@@ -566,6 +566,19 @@ select.inp{cursor:pointer;}
       <button onclick="rezCopy()" class="btn btn-secondary">&#x1f4cb; Kopiuj tabelę</button>
     </div>
     <div id="rezCopyOk" class="alert alert-ok" style="display:none;margin-top:8px;">✓ Skopiowano!</div>
+  </div>
+</div>
+
+<div id="overlayRezStats" onclick="if(event.target===this)rezStatsClose();" style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.9);backdrop-filter:blur(14px);align-items:flex-end;justify-content:center;">
+  <div style="width:100%;max-width:430px;max-height:88vh;overflow-y:auto;background:linear-gradient(180deg,#151515,#0d0d0d);border-radius:24px 24px 0 0;padding:20px 20px 40px;">
+    <div style="width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 18px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:20px;font-weight:700;color:#a78bfa;">📊 Statystyki</div>
+      <button onclick="rezStatsClose()" style="background:transparent;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:4px 8px;">✕</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text3);margin-bottom:16px;">Tylko realne, potwierdzone pobyty — bez anulowanych, zablokowanych i zdublowanych terminów.</div>
+    <div id="rezStatsYears" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;"></div>
+    <div id="rezStatsBody"></div>
   </div>
 </div>
 
@@ -2145,6 +2158,94 @@ function rezSync(){
       console.error("rezSync:",e);
       if(btn){btn.textContent="!";btn.style.opacity="1";btn.disabled=false;setTimeout(function(){btn.innerHTML="&#x1f504;";},2000);}
     });
+}
+
+// ── STATYSTYKI REZERWACJI (per rok) ──
+// Wiarygodność:
+// 1) Anulowane rezerwacje same znikają z rez_cache przy każdej synchronizacji
+//    (rezSync buduje "merged" WYŁĄCZNIE z tego, co iCal zwraca teraz — patrz
+//    komentarz w rezSync), więc tu nie trzeba już nic filtrować pod tym
+//    kątem — ale i tak dodatkowo odsiewamy wpisy bez dat.
+// 2) Bloki "Closed Period" / "Not available" (Airbnb/Booking wstawiają je do
+//    iCal jako fejkowe "rezerwacje") są wycinane tym samym wzorcem, którego
+//    apka już używa na ekranie głównym (BLOCKED_RE).
+// 3) Duplikaty po UID są odsiewane przez Map — każdy UID liczy się raz,
+//    niezależnie ile razy mógłby się powtórzyć w cache.
+function rezStatsGetClean(){
+  var BLOCKED_RE=/closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
+  var byUid=new Map();
+  rezData.forEach(function(ev){
+    if(!ev.start||!ev.end)return;
+    var name=ev._name||ev.summary||"";
+    if(BLOCKED_RE.test(name))return;
+    var s=new Date(ev.start),e=new Date(ev.end);
+    if(isNaN(s)||isNaN(e))return;
+    var nights=Math.round((e-s)/86400000);
+    if(nights<1)return; // wpis wadliwy (0 lub ujemne noce) — nie liczymy
+    var key=ev.uid||(ev.start+"_"+ev.end); // brak uid (np. ręczne wpisy) -> klucz zastępczy
+    if(!byUid.has(key))byUid.set(key,{start:s,end:e,nights:nights});
+  });
+  return Array.from(byUid.values());
+}
+
+function rezStatsOpen(){
+  var clean=rezStatsGetClean();
+  var years=Array.from(new Set(clean.map(function(x){return x.start.getFullYear();}))).sort(function(a,b){return b-a;});
+  var yEl=document.getElementById("rezStatsYears");
+  var bEl=document.getElementById("rezStatsBody");
+  if(!years.length){
+    yEl.innerHTML="";
+    bEl.innerHTML='<div style="text-align:center;padding:40px 10px;color:var(--text3);">Brak jeszcze danych rezerwacji do policzenia.</div>';
+  } else {
+    yEl.innerHTML=years.map(function(y,i){
+      return '<button onclick="rezStatsShowYear('+y+')" id="rezStatsYearBtn'+y+'" class="rez-stats-year-btn" style="padding:8px 16px;border-radius:12px;border:1px solid rgba(167,139,250,.3);background:'+(i===0?'rgba(167,139,250,.18)':'transparent')+';color:'+(i===0?'#a78bfa':'var(--text2)')+';font-size:14px;font-weight:600;cursor:pointer;">'+y+'</button>';
+    }).join("");
+    rezStatsShowYear(years[0]);
+  }
+  document.getElementById("overlayRezStats").style.display="flex";
+}
+function rezStatsClose(){document.getElementById("overlayRezStats").style.display="none";}
+
+function rezStatsShowYear(year){
+  document.querySelectorAll(".rez-stats-year-btn").forEach(function(b){
+    var isActive=b.id==="rezStatsYearBtn"+year;
+    b.style.background=isActive?"rgba(167,139,250,.18)":"transparent";
+    b.style.color=isActive?"#a78bfa":"var(--text2)";
+  });
+  var clean=rezStatsGetClean().filter(function(x){return x.start.getFullYear()===year;});
+  var bEl=document.getElementById("rezStatsBody");
+  if(!clean.length){
+    bEl.innerHTML='<div style="text-align:center;padding:30px 10px;color:var(--text3);">Brak rezerwacji w '+year+' roku.</div>';
+    return;
+  }
+  var totalRes=clean.length;
+  var totalNights=clean.reduce(function(s,x){return s+x.nights;},0);
+  var avg=(totalNights/totalRes);
+  var hist={};
+  clean.forEach(function(x){hist[x.nights]=(hist[x.nights]||0)+1;});
+  var nightsKeys=Object.keys(hist).map(Number).sort(function(a,b){return a-b;});
+  var maxCount=Math.max.apply(null,nightsKeys.map(function(n){return hist[n];}));
+
+  var html='';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">';
+  html+='<div class="card-gold" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--gold2);">'+totalRes+'</div><div style="font-size:11.5px;color:var(--text3);margin-top:2px;">rezerwacji</div></div>';
+  html+='<div class="card-gold" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--gold2);">'+totalNights+'</div><div style="font-size:11.5px;color:var(--text3);margin-top:2px;">nocy łącznie</div></div>';
+  html+='<div class="card-gold" style="padding:14px;text-align:center;grid-column:1/-1;"><div style="font-size:26px;font-weight:800;color:var(--gold2);">'+avg.toFixed(1)+'</div><div style="font-size:11.5px;color:var(--text3);margin-top:2px;">średnia długość pobytu (noce)</div></div>';
+  html+='</div>';
+
+  html+='<div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;">Ile nocy było rezerwowane — i jak często</div>';
+  html+='<div style="display:flex;flex-direction:column;gap:6px;">';
+  nightsKeys.forEach(function(n){
+    var c=hist[n];
+    var pct=Math.round((c/maxCount)*100);
+    html+='<div style="display:flex;align-items:center;gap:10px;">';
+    html+='<div style="width:44px;font-size:13px;color:var(--text2);text-align:right;flex-shrink:0;">'+n+' noc'+(n===1?'':(n<5&&n%10>=2&&n%10<=4&&(n<10||n>20)?'e':'y'))+'</div>';
+    html+='<div style="flex:1;height:20px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;"><div style="height:100%;width:'+Math.max(pct,6)+'%;background:linear-gradient(90deg,#a78bfa,#c9a96e);border-radius:6px;"></div></div>';
+    html+='<div style="width:22px;font-size:13px;font-weight:700;color:var(--gold2);flex-shrink:0;">'+c+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  bEl.innerHTML=html;
 }
 
 function rezRender(){
