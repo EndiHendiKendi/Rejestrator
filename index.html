@@ -570,7 +570,7 @@ select.inp{cursor:pointer;}
 </div>
 
 <div id="overlayRezStats" style="display:none;position:fixed;inset:0;z-index:450;background:#0a0a0f;overflow-y:auto;">
-  <div class="topbar" style="position:sticky;top:0;background:#0a0a0f;z-index:2;">
+  <div class="topbar" style="position:sticky;top:0;background:#0a0a0f;z-index:2;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 12px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <button onclick="rezStatsClose()" style="background:transparent;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:4px 6px 4px 0;line-height:1;">←</button>
       <div><div class="topbar-title">📊 Statystyki</div><div class="topbar-sub">Historia rezerwacji po latach</div></div>
@@ -2556,6 +2556,45 @@ function rezCopy(){
 // Callback rezerwacje obsługiwany w showScreen
 
 (function(){try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}})();
+
+// ── JEDNORAZOWE uzupełnienie historii 2025/2026, których apka wcześniej
+// utraciła (patrz naprawa w rezSync — stare wpisy znikały z cache przy
+// każdej synchronizacji, zanim to zostało naprawione). Uruchamia się
+// dokładnie raz na urządzenie (flaga w localStorage), dopisuje tylko te
+// terminy, których jeszcze nie ma w rez_cache (po dacie zameldowania) —
+// nic nie nadpisuje ani nie duplikuje. Jeśli używasz synchronizacji w
+// Ustawieniach, te dane rozejdą się też na inne urządzenia przy najbliższym
+// pushu/pobraniu — wystarczy zrobić to raz na jednym telefonie.
+(function seedHistoricalReservations(){
+  var FLAG="hist_seed_2026_07_v1";
+  if(localStorage.getItem(FLAG))return;
+  var ranges=[
+    ["2025-04-18","2025-04-27"],["2025-05-01","2025-05-04"],["2025-05-26","2025-05-30"],
+    ["2025-06-12","2025-06-15"],["2025-06-15","2025-06-22"],["2025-06-29","2025-07-10"],
+    ["2025-07-12","2025-07-19"],["2025-07-28","2025-08-04"],["2025-08-04","2025-08-09"],
+    ["2025-08-11","2025-08-17"],["2025-08-17","2025-08-24"],["2025-08-24","2025-08-27"],
+    ["2025-09-07","2025-09-14"],["2025-09-20","2025-09-24"],["2025-10-09","2025-10-13"],
+    ["2025-10-27","2025-11-01"],["2025-12-30","2026-01-02"],
+    ["2026-04-14","2026-04-17"],["2026-04-30","2026-05-03"],["2026-05-22","2026-05-26"],
+    ["2026-05-28","2026-05-31"],["2026-06-03","2026-06-07"],["2026-06-23","2026-06-30"],
+    ["2026-07-04","2026-07-08"],["2026-07-10","2026-07-13"],["2026-07-13","2026-07-20"]
+  ];
+  try{
+    var cache=[];
+    try{var c=localStorage.getItem("rez_cache");if(c)cache=JSON.parse(c);}catch(e){}
+    var existingStarts={};
+    cache.forEach(function(ev){if(ev.start)existingStarts[ev.start.slice(0,10)]=true;});
+    var added=0;
+    ranges.forEach(function(r,i){
+      if(existingStarts[r[0]])return; // już jest — pomiń, żeby nie zdublować
+      cache.push({uid:"manual_hist_"+i,start:r[0]+"T12:00:00Z",end:r[1]+"T12:00:00Z",_name:"Historia (uzupełnione ręcznie)"});
+      added++;
+    });
+    localStorage.setItem("rez_cache",JSON.stringify(cache));
+    rezData=cache;
+  }catch(e){}
+  localStorage.setItem(FLAG,"1");
+})();
 
 // ================================================================
 // FIRST RUN
