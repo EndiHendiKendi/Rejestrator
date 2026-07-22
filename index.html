@@ -296,6 +296,10 @@ select.inp{cursor:pointer;}
 
   <div class="card-gold">
     <div style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:rgba(201,169,110,.6);margin-bottom:14px;">📅 Pobyt</div>
+    <button id="btnRezPick" onclick="rezPickOpen()" style="width:100%;text-align:left;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:10px 14px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+      <span>📋 Wybierz z rezerwacji</span><span style="font-size:16px;">▾</span>
+    </button>
+    <div id="rezPickList" style="display:none;max-height:260px;overflow-y:auto;background:rgba(255,255,255,.03);border-radius:12px;margin:-6px 0 14px;"></div>
     <div class="field-group">
       <label class="field-lbl">Data zameldowania</label>
       <input id="inpArr" class="inp inp-big" placeholder="DD/MM/YYYY" type="text"/>
@@ -3662,9 +3666,56 @@ async function ocrGo(){
     setTimeout(function(){document.getElementById('overlayOcr').style.display='none';rezRender();},1500);
   }catch(e){st.style.color='#ef4444';st.textContent='Błąd: '+e.message;}
 }
+// ── Wybór rezerwacji do zameldowania — auto-wypełnia datę i liczbę nocy,
+// zamiast każdorazowego ręcznego wpisywania. Apka już zna te dane z iCal/
+// historii, więc to tylko podpowiedź — nadal można ręcznie zmienić po
+// kliknięciu, jeśli akurat trzeba (np. inny termin niż w rezerwacji).
+function rezPickCandidates(){
+  var raw=[];
+  try{var c=localStorage.getItem("rez_cache");if(c)raw=JSON.parse(c);}catch(e){}
+  var today=new Date();today.setHours(0,0,0,0);
+  var BLOCKED_RE=/closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
+  return raw.filter(function(ev){
+    if(!ev.start||!ev.end)return false;
+    var name=ev._name||ev.summary||"";
+    if(BLOCKED_RE.test(name))return false;
+    var e=new Date(ev.end);
+    if(isNaN(e)||e<today)return false; // pokazujemy tylko aktualne/nadchodzące
+    return true;
+  }).sort(function(a,b){return new Date(a.start)-new Date(b.start);});
+}
+function rezPickFmt(iso){var d=new Date(iso);return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();}
+function rezPickApply(ev){
+  var s=new Date(ev.start),e=new Date(ev.end);
+  var nights=Math.max(1,Math.round((e-s)/86400000));
+  document.getElementById("inpArr").value=rezPickFmt(ev.start);
+  document.getElementById("inpNights").value=nights;
+  recalcDep();
+  document.getElementById("rezPickList").style.display="none";
+}
+function rezPickOpen(){
+  var list=document.getElementById("rezPickList");
+  if(list.style.display!=="none"){list.style.display="none";return;}
+  var cands=rezPickCandidates();
+  if(!cands.length){list.innerHTML='<div style="padding:14px;color:var(--text3);font-size:13px;">Brak nadchodzących rezerwacji w danych — sprawdź synchronizację iCal.</div>';}
+  else{
+    list.innerHTML=cands.map(function(ev){
+      var name=(ev._name||ev.summary||"Rezerwacja").replace(/\s*[-–].*$/,"").trim();
+      var nights=Math.max(1,Math.round((new Date(ev.end)-new Date(ev.start))/86400000));
+      return '<button onclick=\'rezPickApply('+JSON.stringify({start:ev.start,end:ev.end})+')\' style="width:100%;text-align:left;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text);font-size:13px;cursor:pointer;">'
+        +'<b>'+rezPickFmt(ev.start)+' → '+rezPickFmt(ev.end)+'</b> · '+nights+' noc'+(nights===1?'':(nights<5?'e':'y'))+'<br><span style="color:var(--text3);">'+name+'</span></button>';
+    }).join("");
+  }
+  list.style.display="block";
+}
+
 // INIT
 // ═══════════════════════════════════════
-document.getElementById("inpArr").value=todayStr();
+(function(){
+  var cands=rezPickCandidates();
+  if(cands.length){rezPickApply(cands[0]);} // domyślnie najbliższa rezerwacja
+  else{document.getElementById("inpArr").value=todayStr();}
+})();
 recalcDep();
 updateKeyStatus();
 
