@@ -18,9 +18,30 @@ export default async function handler(req, res) {
         await kv.set('ical_synced_at', new Date().toISOString());
         const txt = await (await fetch(icalUrl)).text();
         const events = parseIcal(txt);
-        // Filtruj blokady kalendarza (CLOSED PERIOD, Not Available, Blocked itp.)
-        const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable/i;
-        const realEvs = events.filter(e => e.summary && !BLOCK_PATTERN.test(e.summary));
+        // Filtruj: (1) tekstowe blokady kalendarza, (2) "preparation time" —
+        // krótkie (≤1 noc) wpisy doklejone bezpośrednio do prawdziwej
+        // rezerwacji, bez przerwy (patrz komentarz w index.html przy
+        // filterRealReservations — ta sama logika, żeby oba miejsca się
+        // nie rozjeżdżały).
+        const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
+        const withDates = events.filter(e => e.start && e.end);
+        const startsByDay = {}, endsByDay = {};
+        withDates.forEach(e => {
+          const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
+          (startsByDay[sk] = startsByDay[sk]||[]).push(e);
+          (endsByDay[ek] = endsByDay[ek]||[]).push(e);
+        });
+        const realEvs = withDates.filter(e => {
+          if (!e.summary || BLOCK_PATTERN.test(e.summary)) return false;
+          const s = new Date(e.start), en = new Date(e.end);
+          const nights = Math.round((en - s) / 86400000);
+          if (nights < 1) return false;
+          if (nights > 1) return true;
+          const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
+          const touchesBefore = (endsByDay[sk]||[]).some(o => o !== e);
+          const touchesAfter  = (startsByDay[ek]||[]).some(o => o !== e);
+          return !(touchesBefore || touchesAfter);
+        });
 
         // Pobierz poprzedni snapshot iCal
         const prevRaw = await kv.get('ical_events');

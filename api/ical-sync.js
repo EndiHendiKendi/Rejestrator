@@ -16,6 +16,29 @@ export default async function handler(req, res) {
     const events = parseIcal(text);
     const now = Date.now();
 
+    // Ta sama logika co w api/cron.js i w index.html (filterRealReservations) —
+    // odsiewamy blokady kalendarza i bufory "preparation time", żeby nie
+    // budować dla nich fałszywych powiadomień o zameldowaniu/wymeldowaniu.
+    const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
+    const withDates = events.filter(e => e.start && e.end);
+    const startsByDay = {}, endsByDay = {};
+    withDates.forEach(e => {
+      const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
+      (startsByDay[sk] = startsByDay[sk]||[]).push(e);
+      (endsByDay[ek] = endsByDay[ek]||[]).push(e);
+    });
+    const realEvs = withDates.filter(e => {
+      if (!e.summary || BLOCK_PATTERN.test(e.summary)) return false;
+      const s = new Date(e.start), en = new Date(e.end);
+      const nights = Math.round((en - s) / 86400000);
+      if (nights < 1) return false;
+      if (nights > 1) return true;
+      const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
+      const touchesBefore = (endsByDay[sk]||[]).some(o => o !== e);
+      const touchesAfter  = (startsByDay[ek]||[]).some(o => o !== e);
+      return !(touchesBefore || touchesAfter);
+    });
+
     // WAŻNE: harmonogram budujemy DOKŁADNIE tą samą funkcją co api/cron.js
     // (buildSchedule — liczy godziny w czasie włoskim przez italyLocalToUTC).
     // Wcześniej ten plik miał własną, osobną wersję liczącą godziny w
@@ -23,12 +46,7 @@ export default async function handler(req, res) {
     // godziny o 1-2h, a przy odświeżeniu/zmianie linku iCal z apki
     // (przyciski w Ustawieniach) CAŁKOWICIE nadpisywało poprawny
     // harmonogram zbudowany wcześniej przez cron.js tym przesuniętym.
-    // Jeśli przesunięta godzina "rozliczenia" (checkout+2dni 18:00)
-    // wypadła w przeszłości względem `now` w momencie przeliczania —
-    // wpis nigdy nie trafiał do harmonogramu i powiadomienie ginęło
-    // bezpowrotnie. To był realny powód niewysłanego przypomnienia
-    // o rozliczeniu z Margheritą.
-    const schedule = buildSchedule(events, now);
+    const schedule = buildSchedule(realEvs, now);
 
     const { kv } = await import('@vercel/kv');
     await kv.set('ical_url', icalUrl);
