@@ -403,6 +403,11 @@ select.inp{cursor:pointer;}
         <input id="oResid" class="inp" list="natList3" placeholder="zostaw puste jeśli takie samo"/>
         <datalist id="natList3"><option>SVIZZERA</option><option>FRANCE</option><option>GERMANY</option><option>ITALIA</option><option>POLAND</option><option>AUSTRIA</option><option>BELGIUM</option><option>NETHERLANDS</option><option>SPAIN</option><option>UNITED KINGDOM</option><option>USA</option><option>CANADA</option></datalist>
       </div>
+      <div class="field-group mb8" id="wrapComuneResid" style="display:none;">
+        <label class="field-lbl">Comune zamieszkania <span style="color:var(--text3);font-weight:400;">(wymagane dla Włoch — dotyczy KAŻDEGO gościa)</span></label>
+        <input id="oComuneResid" class="inp" placeholder="wpisz nazwę miejscowości..." autocomplete="off"/>
+        <div id="oComuneResidList" class="comune-dropdown" style="display:none;"></div>
+      </div>
       <div class="field-group mb8" id="wrapComuneNasc" style="display:none;">
         <label class="field-lbl">Comune urodzenia <span style="color:var(--text3);font-weight:400;">(wymagane dla Włoch)</span></label>
         <input id="oComuneNasc" class="inp" placeholder="wpisz nazwę miejscowości..." autocomplete="off"/>
@@ -592,6 +597,18 @@ select.inp{cursor:pointer;}
       <button onclick="rezCopy()" class="btn btn-secondary">&#x1f4cb; Kopiuj tabelę</button>
     </div>
     <div id="rezCopyOk" class="alert alert-ok" style="display:none;margin-top:8px;">✓ Skopiowano!</div>
+  </div>
+</div>
+
+<div id="overlayWarnModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;background:linear-gradient(180deg,#1a1410,#100c09);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:22px;">
+    <div style="font-size:17px;font-weight:700;color:#ef4444;margin-bottom:12px;">⚠ <span id="warnModalTitle"></span></div>
+    <div id="warnModalList" style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:12px;"></div>
+    <div id="warnModalNote" style="font-size:12.5px;color:var(--text3);margin-bottom:18px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button id="warnModalCancel" class="btn btn-secondary" style="flex:1;">Anuluj</button>
+      <button id="warnModalProceed" class="btn" style="flex:1;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444;">Pobierz mimo to</button>
+    </div>
   </div>
 </div>
 
@@ -858,24 +875,50 @@ function attachComuneAutocomplete(inputId,listId,mode){
   });
   inp.addEventListener("blur",function(){setTimeout(function(){list.style.display="none";},200);});
 }
-function fillComuneNascFromHint(name){
-  var inp=document.getElementById("oComuneNasc");
+// ── Kody prowincji -> stolica prowincji. Prawo jazdy wydaje "Motorizzazione
+// Civile" danej prowincji, więc na dokumencie widnieje np. "MC GE" albo
+// "M.C.T.C. MI" zamiast nazwy miasta — to NIE jest nazwa gminy, trzeba
+// rozpoznać wzorzec i podstawić stolicę prowincji.
+var PROVINCE_CAPITALS={"AG":"AGRIGENTO","AL":"ALESSANDRIA","AN":"ANCONA","AO":"AOSTA","AP":"ASCOLI PICENO","AQ":"L'AQUILA","AR":"AREZZO","AT":"ASTI","AV":"AVELLINO","BA":"BARI","BG":"BERGAMO","BI":"BIELLA","BL":"BELLUNO","BN":"BENEVENTO","BO":"BOLOGNA","BR":"BRINDISI","BS":"BRESCIA","BT":"BARLETTA","BZ":"BOLZANO","CA":"CAGLIARI","CB":"CAMPOBASSO","CE":"CASERTA","CH":"CHIETI","CL":"CALTANISSETTA","CN":"CUNEO","CO":"COMO","CR":"CREMONA","CS":"COSENZA","CT":"CATANIA","CZ":"CATANZARO","EN":"ENNA","FC":"FORLI'","FE":"FERRARA","FG":"FOGGIA","FI":"FIRENZE","FM":"FERMO","FR":"FROSINONE","GE":"GENOVA","GO":"GORIZIA","GR":"GROSSETO","IM":"IMPERIA","IS":"ISERNIA","KR":"CROTONE","LC":"LECCO","LE":"LECCE","LI":"LIVORNO","LO":"LODI","LT":"LATINA","LU":"LUCCA","MB":"MONZA","MC":"MACERATA","ME":"MESSINA","MI":"MILANO","MN":"MANTOVA","MO":"MODENA","MS":"MASSA","MT":"MATERA","NA":"NAPOLI","NO":"NOVARA","NU":"NUORO","OR":"ORISTANO","PA":"PALERMO","PC":"PIACENZA","PD":"PADOVA","PE":"PESCARA","PG":"PERUGIA","PI":"PISA","PN":"PORDENONE","PO":"PRATO","PR":"PARMA","PT":"PISTOIA","PU":"PESARO","PV":"PAVIA","PZ":"POTENZA","RA":"RAVENNA","RC":"REGGIO CALABRIA","RE":"REGGIO EMILIA","RG":"RAGUSA","RI":"RIETI","RM":"ROMA","RN":"RIMINI","RO":"ROVIGO","SA":"SALERNO","SI":"SIENA","SO":"SONDRIO","SP":"LA SPEZIA","SR":"SIRACUSA","SS":"SASSARI","SV":"SAVONA","TA":"TARANTO","TE":"TERAMO","TN":"TRENTO","TO":"TORINO","TP":"TRAPANI","TR":"TERNI","TS":"TRIESTE","TV":"TREVISO","UD":"UDINE","VA":"VARESE","VB":"VERBANIA","VC":"VERCELLI","VE":"VENEZIA","VI":"VICENZA","VR":"VERONA","VT":"VITERBO","VV":"VIBO VALENTIA"};
+// Rozpoznaje "MC GE" / "M.C. GE" / "MCTC MI" / "M.C.T.C. TO" itp. (skrót
+// urzędu Motorizzazione Civile + kod prowincji) i podstawia stolicę.
+function resolveMotorizzazioneAbbrev(text){
+  var m=String(text||"").trim().toUpperCase().match(/^M\.?\s?C\.?\s?T?\.?\s?C?\.?\s+([A-Z]{2})$/);
+  if(m&&PROVINCE_CAPITALS[m[1]])return {name:PROVINCE_CAPITALS[m[1]],prov:m[1]};
+  return null;
+}
+
+function fillComuneNascFromHint(name){fillComuneNascFromHintInto(document.getElementById("oComuneNasc"),name);}
+function fillComuneNascFromHintInto(inp,name){
   delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
   if(!name){inp.value="";return;}
   var q=String(name).trim().toUpperCase();
   var exact=COMUNI_DATA.filter(function(r){return r[1]===q;});
   exact.sort(function(a,b){return a[3]-b[3];});
-  if(exact.length){inp.value=exact[0][1];inp.dataset.code=exact[0][0];inp.dataset.prov=exact[0][2];}
-  else{inp.value=name;} // AI podpowiedziało nazwę, ale trzeba potwierdzić z listy poniżej
+  if(exact.length){inp.value=exact[0][1];inp.dataset.code=exact[0][0];inp.dataset.prov=exact[0][2];return;}
+  var abbr=resolveMotorizzazioneAbbrev(q);
+  if(abbr){
+    var byName=COMUNI_DATA.filter(function(r){return r[1]===abbr.name&&r[2]===abbr.prov;});
+    byName.sort(function(a,b){return a[3]-b[3];});
+    if(byName.length){inp.value=byName[0][1];inp.dataset.code=byName[0][0];inp.dataset.prov=byName[0][2];return;}
+  }
+  inp.value=name; // AI podpowiedziało nazwę, ale trzeba potwierdzić z listy poniżej
 }
-function fillDocPlaceFromHint(name){
-  var inp=document.getElementById("oDocPlace");
+function fillDocPlaceFromHint(name){fillDocPlaceFromHintInto(document.getElementById("oDocPlace"),name);}
+function fillDocPlaceFromHintInto(inp,name){
   delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
   if(!name){inp.value="";return;}
   var q=String(name).trim().toUpperCase();
   var exactC=COMUNI_DATA.filter(function(r){return r[1]===q;});
   exactC.sort(function(a,b){return a[3]-b[3];});
   if(exactC.length){inp.value=exactC[0][1];inp.dataset.code=exactC[0][0];inp.dataset.prov=exactC[0][2];inp.dataset.type="comune";return;}
+  // "MC GE" itp. (prawo jazdy — Motorizzazione Civile + prowincja) -> stolica prowincji
+  var abbr=resolveMotorizzazioneAbbrev(q);
+  if(abbr){
+    var byName=COMUNI_DATA.filter(function(r){return r[1]===abbr.name&&r[2]===abbr.prov;});
+    byName.sort(function(a,b){return a[3]-b[3];});
+    if(byName.length){inp.value=byName[0][1];inp.dataset.code=byName[0][0];inp.dataset.prov=byName[0][2];inp.dataset.type="comune";return;}
+  }
   var normed=normC(name);
   if(COUNTRY_LIST.indexOf(normed)>-1){inp.value=normed;inp.dataset.code=getNC(normed);inp.dataset.type="stato";return;}
   inp.value=name; // trzeba potwierdzić/wybrać ręcznie z listy
@@ -900,6 +943,7 @@ function fillDocTypeFromHint(text){
   }
 }
 attachComuneAutocomplete("oComuneNasc","oComuneNascList","comune");
+attachComuneAutocomplete("oComuneResid","oComuneResidList","comune");
 attachComuneAutocomplete("oDocPlace","oDocPlaceList","mixed");
 
 // ── Wyszukiwarka "Inny dokument" — pełna lista 95 oficjalnych typów ──
@@ -932,13 +976,30 @@ document.getElementById("oDocTypeSearch").addEventListener("input",function(){
   });
 });
 
-// ── Pokaż pole "Comune urodzenia" tylko gdy gość urodzony we Włoszech ──
+// ── Pokaż pola "Comune" tylko gdy dotyczą Włoch ──
 function refreshComuneVisibility(){
   var birth=document.getElementById("oBirth").value||document.getElementById("oNat").value;
+  var resid=document.getElementById("oResid").value||document.getElementById("oNat").value;
   document.getElementById("wrapComuneNasc").style.display=isIT(birth)?"block":"none";
+  document.getElementById("wrapComuneResid").style.display=isIT(resid)?"block":"none";
 }
 document.getElementById("oNat").addEventListener("input",refreshComuneVisibility);
 document.getElementById("oBirth").addEventListener("input",refreshComuneVisibility);
+document.getElementById("oResid").addEventListener("input",refreshComuneVisibility);
+
+// ── Zabezpieczenie przed zapisem: jeśli ktoś wpisał tekst ręcznie i od razu
+// kliknął zapisz (bez tapnięcia podpowiedzi z listy), pole zostawało puste
+// mimo wyglądającej na wypełnioną wartości — to była realna przyczyna
+// "znikającego" miejsca wydania/comune. Przy zapisie próbujemy jeszcze raz
+// dopasować dokładnie to, co widać w polu, zanim uznamy że jest puste.
+function resolveComuneInputAtSave(inputId,isComuneOnly){
+  var inp=document.getElementById(inputId);
+  if(inp.dataset.code)return; // już poprawnie wybrane z listy — nic do zrobienia
+  var val=(inp.value||"").trim();
+  if(!val)return;
+  if(isComuneOnly){fillComuneNascFromHintInto(inp,val);}
+  else{fillDocPlaceFromHintInto(inp,val);}
+}
 
 function normC(r){var k=String(r||"").toLowerCase().trim().replace(/[éèêë]/g,"e").replace(/[àâ]/g,"a").replace(/[ùû]/g,"u").replace(/œ/g,"oe").replace(/ü/g,"u").replace(/ö/g,"o").replace(/ä/g,"a").replace(/ß/g,"ss");return CM[k]||san(r).toUpperCase();}
 function isIT(r){return["italia","italy","italie","italien","ita","włochy","wlochy"].indexOf(String(r||"").toLowerCase().trim())>=0;}
@@ -974,7 +1035,20 @@ var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje","karty"];
 // Historia nawigacji — przycisk wstecz nie wyrzuca z apki
 // Overlay IDs które mogą być otwarte i powinny być zamknięte przez "wstecz"
-var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats"];
+var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayWarnModal"];
+
+function showWarnModal(title,items,note,onProceed){
+  document.getElementById("warnModalTitle").textContent=title;
+  document.getElementById("warnModalList").innerHTML=items.map(function(x){return "• "+x;}).join("<br>");
+  document.getElementById("warnModalNote").textContent=note||"";
+  var ov=document.getElementById("overlayWarnModal");
+  ov.style.display="flex";
+  var cancelBtn=document.getElementById("warnModalCancel");
+  var proceedBtn=document.getElementById("warnModalProceed");
+  function cleanup(){ov.style.display="none";cancelBtn.onclick=null;proceedBtn.onclick=null;}
+  cancelBtn.onclick=function(){cleanup();};
+  proceedBtn.onclick=function(){cleanup();onProceed();};
+}
 function closeTopOverlay(){
   // Zamknij pierwszy widoczny overlay od góry (najwyższy z-index ostatni w liście)
   for(var _oi=OVERLAY_IDS.length-1;_oi>=0;_oi--){
@@ -1389,8 +1463,10 @@ function runOcr(file,onDone){
   document.getElementById("oDocType").value="";
   document.getElementById("oDocNum").value="";
   fillComuneNascFromHint("");
+  fillComuneNascFromHintInto(document.getElementById("oComuneResid"),"");
   fillDocPlaceFromHint("");
   document.getElementById("wrapComuneNasc").style.display="none";
+  document.getElementById("wrapComuneResid").style.display="none";
   setOcrGender("");
 
   document.getElementById("ocrResult").style.display="none";
@@ -1521,7 +1597,16 @@ function applyOcr(guestId){
   var existingGuest = targetId ? guests.find(function(x){return x.id===targetId;}) : null;
   var isLeaderVal = existingGuest ? existingGuest.isLeader : isFirst;
   
+  // Zabezpieczenie: jeśli w polu jest wpisany tekst, ale nikt nie kliknął
+  // podpowiedzi z listy (np. wpisał i od razu zapisał), spróbuj dopasować
+  // dokładnie teraz — inaczej wartość wygląda na wypełnioną, a nic się nie
+  // zapisuje (to była przyczyna "znikającego" pola).
+  resolveComuneInputAtSave("oComuneNasc",true);
+  resolveComuneInputAtSave("oComuneResid",true);
+  resolveComuneInputAtSave("oDocPlace",false);
+
   var comuneNascInp=document.getElementById("oComuneNasc");
+  var comuneResidInp=document.getElementById("oComuneResid");
   var docPlaceInp=document.getElementById("oDocPlace");
   var up={
     lastName:san(document.getElementById("oLast").value),
@@ -1536,13 +1621,15 @@ function applyOcr(guestId){
     docNumber:san(document.getElementById("oDocNum").value),
     birthComuneCode:comuneNascInp.dataset.code||"",
     birthComuneProv:comuneNascInp.dataset.prov||"",
+    residComuneCode:comuneResidInp.dataset.code||"",
+    residComuneProv:comuneResidInp.dataset.prov||"",
     docIssuePlace:docPlaceInp.dataset.code?{type:docPlaceInp.dataset.type||"stato",code:docPlaceInp.dataset.code}:null
   };
   
   if(targetId){
     for(var i=0;i<guests.length;i++){if(guests[i].id===targetId){Object.assign(guests[i],up);break;}}
   } else {
-    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,birthComuneCode:up.birthComuneCode,birthComuneProv:up.birthComuneProv,docIssuePlace:up.docIssuePlace,role:isFirst?"Capogruppo":"Membro"});
+    guests.push({id:uid(),firstName:up.firstName,lastName:up.lastName,rawFirst:"",rawLast:"",gender:up.gender||null,dob:up.dob||"",cit:up.cit,birthC:up.birthC,residC:up.residC,isItaly:up.isItaly,isLeader:isFirst,gtype:gtype,docType:up.docType||"",docNumber:up.docNumber,birthComuneCode:up.birthComuneCode,birthComuneProv:up.birthComuneProv,residComuneCode:up.residComuneCode,residComuneProv:up.residComuneProv,docIssuePlace:up.docIssuePlace,role:isFirst?"Capogruppo":"Membro"});
   }
 
   // Reset trybu edycji
@@ -1684,6 +1771,11 @@ function editGuest(id) {
     var cInp=document.getElementById("oComuneNasc");
     cInp.value=cRow?cRow[1]:"";cInp.dataset.code=g.birthComuneCode;cInp.dataset.prov=g.birthComuneProv||(cRow?cRow[2]:"");
   } else { fillComuneNascFromHint(""); }
+  if(g.residComuneCode){
+    var rRow=COMUNI_DATA.find(function(r){return r[0]===g.residComuneCode;});
+    var rInp=document.getElementById("oComuneResid");
+    rInp.value=rRow?rRow[1]:"";rInp.dataset.code=g.residComuneCode;rInp.dataset.prov=g.residComuneProv||(rRow?rRow[2]:"");
+  } else { fillComuneNascFromHintInto(document.getElementById("oComuneResid"),""); }
   if(g.docIssuePlace&&g.docIssuePlace.code){
     var dInp=document.getElementById("oDocPlace");
     if(g.docIssuePlace.type==="comune"){
@@ -1740,8 +1832,38 @@ function genTXT(){
   var orderedGuests=guests.slice().sort(function(a,b){return (b.isLeader?1:0)-(a.isLeader?1:0);});
   return orderedGuests.map(function(g,i){
     var tot=orderedGuests.length,t=tipo(g,tot),head=(t==="16"||t==="17"||t==="18");
-    var ncC=getNC(g.cit),ncB=getNC(g.birthC||g.cit),ncR=getNC(g.residC||g.cit);
-    return pp(t,2)+pp(arr,10)+pp(san(g.lastName),50)+pp(san(g.firstName),30)+(g.gender==="F"?"2":"1")+pp(g.dob,10)+pp("",9)+pp(g.isItaly?"  ":"EE",2)+pp(ncB,9,true)+pp(ncC,9,true)+pp("",9)+pp("",2)+pp(ncR,9,true)+pp("",50)+(head?pp(DC[g.docType]||g.docType||"",5):pp("",5))+(head?pp(san(g.docNumber||""),20):pp("",20))+pp("",9)+pp(dep,10)+pp("Non Specificato",30)+pp("Non Specificato",30)+(head?String(Number(camOcc)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.camDisp)||1).padStart(3,"0"):pp("",3))+(head?String(Number(STRUCT.lettiDisp)||2).padStart(4,"0"):pp("",4))+"0"+pp(pfx+String(i+1).padStart(6,"0"),10)+"1";
+    var birthCtry=g.birthC||g.cit;
+    var bornIT=isIT(birthCtry);
+    var residCtry=g.residC||g.cit;
+    var residIT=isIT(residCtry);
+    // Pola 7-8: comune/provincia di nascita — wymagane TYLKO jeśli mamy je
+    // zapisane (pole "Comune urodzenia" w formularzu), opcjonalne per spec.
+    var comuneNasc=(bornIT&&g.birthComuneCode)?pp(g.birthComuneCode,9,true):pp("",9);
+    var provNasc=(bornIT&&g.birthComuneProv)?pp(g.birthComuneProv,2):pp("",2);
+    var statoNasc=pp(getNC(birthCtry),9,true);      // pole 9 — zawsze wymagane
+    var statoCit=pp(getNC(g.cit),9,true);            // pole 10 — zawsze wymagane
+    // Pola 11-13: comune/provincia/stato di residenza — WYMAGANE dla
+    // WSZYSTKICH gości (nie tylko lidera!) jeśli mieszkają we Włoszech —
+    // to jest realna przyczyna błędu "comune di residenza non inserito"
+    // widocznego na Ross1000: to pole było wcześniej zawsze puste.
+    var comuneResid=(residIT&&g.residComuneCode)?pp(g.residComuneCode,9,true):pp("",9);
+    var provResid=(residIT&&g.residComuneProv)?pp(g.residComuneProv,2):pp("",2);
+    var statoResid=pp(getNC(residCtry),9,true);       // pole 13 — zawsze wymagane
+    // Pole 17: Luogo o Stato rilascio documento — JEDNO pole (9 cyfr), kod
+    // gminy (jeśli wydany we Włoszech) albo kod kraju — nie obywatelstwo.
+    var luogoRilascio;
+    if(g.docIssuePlace&&g.docIssuePlace.code)luogoRilascio=pp(g.docIssuePlace.code,9,true);
+    else luogoRilascio=pp("",9);
+    return pp(t,2)+pp(arr,10)+pp(san(g.lastName),50)+pp(san(g.firstName),30)+(g.gender==="F"?"2":"1")+pp(g.dob,10)
+      +comuneNasc+provNasc+statoNasc+statoCit+comuneResid+provResid+statoResid+pp("",50)
+      +(head?pp(DC[g.docType]||g.docType||"",5):pp("",5))
+      +(head?pp(san(g.docNumber||""),20):pp("",20))
+      +(head?luogoRilascio:pp("",9))
+      +pp(dep,10)+pp("Non Specificato",30)+pp("Non Specificato",30)
+      +(head?String(Number(camOcc)||1).padStart(3,"0"):pp("",3))
+      +(head?String(Number(STRUCT.camDisp)||1).padStart(3,"0"):pp("",3))
+      +(head?String(Number(STRUCT.lettiDisp)||2).padStart(4,"0"):pp("",4))
+      +"0"+pp(pfx+String(i+1).padStart(6,"0"),10)+"1";
   }).join("\r\n");
 }
 
@@ -1864,6 +1986,16 @@ document.getElementById("btnDownload").addEventListener("click",function(){
   else{document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="⚠ Skopiuj poniżej → zapisz jako "+fname;document.getElementById("dlFallback").style.display="block";document.getElementById("dlTxt").value=content;}
 });
 
+function proceedQuesturaDownload(){
+  var arr=document.getElementById("inpArr").value;
+  var content=genQuestura();
+  var fname=STRUCT.code+"_"+arr.replace(/\//g,"")+"_questura.txt";
+  var ok=false;
+  try{var blob=new Blob([content],{type:"text/plain;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=fname;a.style.display="none";document.body.appendChild(a);a.click();setTimeout(function(){try{document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}},500);ok=true;}catch(e){}
+  if(!ok){try{var a2=document.createElement("a");a2.href="data:text/plain;charset=utf-8,"+encodeURIComponent(content);a2.download=fname;document.body.appendChild(a2);a2.click();document.body.removeChild(a2);ok=true;}catch(e){}}
+  if(ok){document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="✓ Pobrano: "+fname;document.getElementById("dlFallback").style.display="none";_rzSaveMeldunekLeader();}
+  else{document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="⚠ Skopiuj poniżej → zapisz jako "+fname;document.getElementById("dlFallback").style.display="block";document.getElementById("dlTxt").value=content;}
+}
 document.getElementById("btnDownloadQuestura").addEventListener("click",function(){
   if(!guests.length)return;
   var missing=[];
@@ -1877,17 +2009,12 @@ document.getElementById("btnDownloadQuestura").addEventListener("click",function
     }
   });
   if(missing.length){
-    var proceed=confirm("⚠ Uwaga, plik Questura może zostać odrzucony:\n\n"+missing.join("\n")+"\n\nPobrać mimo to? (uzupełnij ręcznie na portalu Alloggiati Web albo wróć i dokończ pole 'Comune urodzenia' / 'Miejsce wydania dokumentu')");
-    if(!proceed)return;
+    showWarnModal("Plik Questura może zostać odrzucony",missing,
+      "Uzupełnij ręcznie na portalu Alloggiati Web, albo wróć i dokończ pole 'Comune urodzenia' / 'Miejsce wydania dokumentu'.",
+      proceedQuesturaDownload);
+  } else {
+    proceedQuesturaDownload();
   }
-  var arr=document.getElementById("inpArr").value;
-  var content=genQuestura();
-  var fname=STRUCT.code+"_"+arr.replace(/\//g,"")+"_questura.txt";
-  var ok=false;
-  try{var blob=new Blob([content],{type:"text/plain;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=fname;a.style.display="none";document.body.appendChild(a);a.click();setTimeout(function(){try{document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}},500);ok=true;}catch(e){}
-  if(!ok){try{var a2=document.createElement("a");a2.href="data:text/plain;charset=utf-8,"+encodeURIComponent(content);a2.download=fname;document.body.appendChild(a2);a2.click();document.body.removeChild(a2);ok=true;}catch(e){}}
-  if(ok){document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="✓ Pobrano: "+fname;document.getElementById("dlFallback").style.display="none";_rzSaveMeldunekLeader();}
-  else{document.getElementById("dlOk").style.display="block";document.getElementById("dlOk").textContent="⚠ Skopiuj poniżej → zapisz jako "+fname;document.getElementById("dlFallback").style.display="block";document.getElementById("dlTxt").value=content;}
 });
 
 // ═══════════════════════════════════════
