@@ -16,27 +16,16 @@ export default async function handler(req, res) {
     const events = parseIcal(text);
     const now = Date.now();
 
-    // Ta sama logika co w api/cron.js i w index.html (filterRealReservations) —
-    // odsiewamy blokady kalendarza i bufory "preparation time", żeby nie
-    // budować dla nich fałszywych powiadomień o zameldowaniu/wymeldowaniu.
+    // Ta sama logika co w api/cron.js i w index.html (filterRealReservations):
+    // odsiewamy blokady kalendarza i bufory "preparation time" regułą
+    // biznesową — rezerwacja to zawsze minimum 3 noce, bez wyjątków.
     const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
-    const withDates = events.filter(e => e.start && e.end);
-    const startsByDay = {}, endsByDay = {};
-    withDates.forEach(e => {
-      const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
-      (startsByDay[sk] = startsByDay[sk]||[]).push(e);
-      (endsByDay[ek] = endsByDay[ek]||[]).push(e);
-    });
-    const realEvs = withDates.filter(e => {
+    const MIN_REAL_NIGHTS = 3;
+    const realEvs = events.filter(e => e.start && e.end).filter(e => {
       if (!e.summary || BLOCK_PATTERN.test(e.summary)) return false;
       const s = new Date(e.start), en = new Date(e.end);
       const nights = Math.round((en - s) / 86400000);
-      if (nights < 1) return false;
-      if (nights > 1) return true;
-      const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
-      const touchesBefore = (endsByDay[sk]||[]).some(o => o !== e);
-      const touchesAfter  = (startsByDay[ek]||[]).some(o => o !== e);
-      return !(touchesBefore || touchesAfter);
+      return nights >= MIN_REAL_NIGHTS;
     });
 
     // WAŻNE: harmonogram budujemy DOKŁADNIE tą samą funkcją co api/cron.js

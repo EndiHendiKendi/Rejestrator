@@ -19,28 +19,17 @@ export default async function handler(req, res) {
         const txt = await (await fetch(icalUrl)).text();
         const events = parseIcal(txt);
         // Filtruj: (1) tekstowe blokady kalendarza, (2) "preparation time" —
-        // krótkie (≤1 noc) wpisy doklejone bezpośrednio do prawdziwej
-        // rezerwacji, bez przerwy (patrz komentarz w index.html przy
-        // filterRealReservations — ta sama logika, żeby oba miejsca się
-        // nie rozjeżdżały).
+        // krótkie wpisy doklejone do prawdziwej rezerwacji (czasem 1 dzień,
+        // czasem 2 przy szybkiej rotacji). Zamiast zgadywać strukturalnie,
+        // używamy reguły biznesowej: rezerwacja w tym obiekcie to ZAWSZE
+        // minimum 3 noce — wszystko poniżej to z definicji nie jest gość.
         const BLOCK_PATTERN = /not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
-        const withDates = events.filter(e => e.start && e.end);
-        const startsByDay = {}, endsByDay = {};
-        withDates.forEach(e => {
-          const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
-          (startsByDay[sk] = startsByDay[sk]||[]).push(e);
-          (endsByDay[ek] = endsByDay[ek]||[]).push(e);
-        });
-        const realEvs = withDates.filter(e => {
+        const MIN_REAL_NIGHTS = 3;
+        const realEvs = events.filter(e => e.start && e.end).filter(e => {
           if (!e.summary || BLOCK_PATTERN.test(e.summary)) return false;
           const s = new Date(e.start), en = new Date(e.end);
           const nights = Math.round((en - s) / 86400000);
-          if (nights < 1) return false;
-          if (nights > 1) return true;
-          const sk = (e.start||'').slice(0,10), ek = (e.end||'').slice(0,10);
-          const touchesBefore = (endsByDay[sk]||[]).some(o => o !== e);
-          const touchesAfter  = (startsByDay[ek]||[]).some(o => o !== e);
-          return !(touchesBefore || touchesAfter);
+          return nights >= MIN_REAL_NIGHTS;
         });
 
         // Pobierz poprzedni snapshot iCal
