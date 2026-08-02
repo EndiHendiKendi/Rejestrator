@@ -901,6 +901,26 @@ function fillComuneNascFromHintInto(inp,name){
   }
   inp.value=name; // AI podpowiedziało nazwę, ale trzeba potwierdzić z listy poniżej
 }
+
+// ── Wypełnia "Comune zamieszkania" TYLKO gdy tekst faktycznie rozwiązuje
+// się na prawdziwą włoską gminę — nigdy na ślepo. To zabezpieczenie przed
+// dokładnie tym błędem, jaki się zdarzył: francuski paszport drukuje
+// "Domicile: ... SÈVRES FRANCE", a "SÈVRES" samo w sobie wygląda jak nazwa
+// miejscowości — bez tej weryfikacji apka wymuszała "Włochy" komukolwiek,
+// niezależnie od faktycznego kraju zamieszkania.
+function fillResidenceFromHint(name){
+  var residInp=document.getElementById("oComuneResid");
+  if(!name){fillComuneNascFromHintInto(residInp,"");return;}
+  fillComuneNascFromHintInto(residInp,name);
+  if(residInp.dataset.code){
+    // rozwiązało się na realną włoską gminę -> to faktycznie zamieszkanie we Włoszech
+    if(!isIT(document.getElementById("oNat").value))document.getElementById("oResid").value="WŁOCHY";
+  } else {
+    // nie rozpoznano jako włoska gmina (np. adres zagraniczny) -> nie zgaduj kraju,
+    // zostaw pole tekstowe do ręcznej weryfikacji, ale NIE nadpisuj Kraju zamieszkania
+    residInp.value="";
+  }
+}
 function fillDocPlaceFromHint(name){fillDocPlaceFromHintInto(document.getElementById("oDocPlace"),name);}
 function fillDocPlaceFromHintInto(inp,name){
   delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
@@ -1007,32 +1027,22 @@ function isIT(r){return["italia","italy","italie","italien","ita","włochy","wlo
 // logiki, co powodowało rozjazdy. Łapie dwa przypadki:
 // 1) Tekstowe blokady kalendarza ("Not available", "Closed period" itp.)
 // 2) "Preparation time" / bufor przed-po rezerwacji — platformy (Airbnb,
-//    Booking.com) wstawiają do iCal osobny, bardzo krótki wpis (zwykle
-//    dokładnie tyle dni, ile ustawiono w "czas na przygotowanie") doklejony
-//    BEZPOŚREDNIO do prawdziwej rezerwacji, czasem pod tą samą "nazwą" co
-//    gość — dlatego samego tekstu nie da się użyć jako jedynego kryterium.
-//    Rozpoznajemy to strukturalnie: wpis ≤1 noc, którego start/koniec styka
-//    się DOKŁADNIE z inną rezerwacją, bez żadnej przerwy — to podpis bufora.
+//    Booking.com) wstawiają do iCal osobny, krótki wpis doklejony do
+//    prawdziwej rezerwacji (czasem 1 dzień, czasem 2 gdy bufor przed i po
+//    nakładają się na siebie przy szybkiej rotacji gości). Zamiast zgadywać
+//    strukturalnie, używamy wprost reguły biznesowej: w tym obiekcie
+//    rezerwacja zawsze trwa MINIMUM 3 noce, bez wyjątków — więc wszystko
+//    poniżej 3 nocy to z definicji NIE jest prawdziwa rezerwacja.
 var BLOCK_TEXT_RE=/not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
+var MIN_REAL_NIGHTS=3;
 function filterRealReservations(events){
   var withDates=events.filter(function(e){return e.start&&e.end;});
-  var startsByDay={},endsByDay={};
-  withDates.forEach(function(e){
-    var sk=(e.start||"").slice(0,10),ek=(e.end||"").slice(0,10);
-    (startsByDay[sk]=startsByDay[sk]||[]).push(e);
-    (endsByDay[ek]=endsByDay[ek]||[]).push(e);
-  });
   return withDates.filter(function(e){
     if(BLOCK_TEXT_RE.test(e.summary||e._name||""))return false;
     var s=new Date(e.start),en=new Date(e.end);
     if(isNaN(s)||isNaN(en))return false;
     var nights=Math.round((en-s)/86400000);
-    if(nights<1)return false; // wpis wadliwy
-    if(nights>1)return true; // dłuższe pobyty na pewno prawdziwe
-    var sk=(e.start||"").slice(0,10),ek=(e.end||"").slice(0,10);
-    var touchesBefore=(endsByDay[sk]||[]).some(function(o){return o!==e;});
-    var touchesAfter=(startsByDay[ek]||[]).some(function(o){return o!==e;});
-    return !(touchesBefore||touchesAfter); // 1-nocny wpis stykający się z inną rezerwacją = bufor
+    return nights>=MIN_REAL_NIGHTS;
   });
 }
 function getNC(c){return NC[String(c||"").toUpperCase()]||"000000000";}
@@ -1486,12 +1496,7 @@ function processOcrQueue(){
     fillDocTypeFromHint(pp.docType||"");
     document.getElementById("oDocNum").value=san(pp.docNumber||"");
     fillComuneNascFromHint(pp.birthPlaceName||"");
-    if(pp.residencePlaceName){
-      if(!isIT(document.getElementById("oNat").value))document.getElementById("oResid").value="WŁOCHY";
-      fillComuneNascFromHintInto(document.getElementById("oComuneResid"),pp.residencePlaceName);
-    } else {
-      fillComuneNascFromHintInto(document.getElementById("oComuneResid"),"");
-    }
+    fillResidenceFromHint(pp.residencePlaceName||"");
     fillDocPlaceFromHint(pp.docIssuePlaceName||"");
     refreshComuneVisibility();
     setOcrGender(pp.gender||"");
@@ -1545,7 +1550,7 @@ function runOcr(file,onDone){
     var mt=file.type||"image/jpeg";
     if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
     
-    var prompt="This image may contain ONE or MORE identity documents. Return ONLY a raw JSON array (even if just one document), no markdown, no extra text. Each element:\n{\"lastName\":\"surname as printed, hyphens replaced with space\",\"firstName\":\"given name(s) as printed, hyphens replaced with space\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"standard English country name: Switzerland/France/Germany/Poland/Italy/Austria/Spain/Belgium/Netherlands/United Kingdom/USA/Canada/Australia/Japan/China/Brazil etc\",\"birthCountry\":\"ONLY if different from nationality. If same country: empty string.\",\"birthPlaceName\":\"the town/city/comune of birth exactly as printed (luogo di nascita), empty string if not printed\",\"residencePlaceName\":\"the town/comune of CURRENT RESIDENCE. On an Italian Carta d'Identita this is the 'COMUNE DI ...' header at the very top of the card (the municipality that issued it — by Italian law an ID card is always issued by your comune of residence), OR the comune named in 'indirizzo di residenza' on the back if visible. On other documents (passport, driving licence) leave this empty unless residence is explicitly printed.\",\"docType\":\"PASSAPORTO, CARTA D'IDENTITA, IDELE (electronic ID), PATENTE (driving licence), PASDI (diplomatic passport), PASSE (service passport), RIFUG (refugee travel document), or the exact Italian document type name as printed if none of these match\",\"docNumber\":\"exact document number as printed\",\"docIssuePlaceName\":\"the place of ISSUE of the document. For Carta d'Identita / IDELE this is the SAME comune as the 'COMUNE DI ...' header — repeat the same value as residencePlaceName. For a driving licence (patente) this is the issuing office as printed, often an abbreviation like 'M.C. GE' or 'MCTC TO' (Motorizzazione Civile + province code) — transcribe it exactly as printed, do not expand it. For a passport, the issuing authority/city as printed. Empty string if not printed.\"}\nIMPORTANT: Return an ARRAY even for one person. Always use ONE consistent English country name. Deutschland=Germany, Polska=Poland, Suisse=Switzerland, Italia=Italy, Espana=Spain. Never mix languages. birthCountry must be empty string if it equals nationality. Replace ALL hyphens in names with a space. For birthPlaceName, residencePlaceName and docIssuePlaceName, transcribe exactly as printed (do not translate), leave empty if genuinely not present — never guess.";
+    var prompt="This image may contain ONE or MORE identity documents. Return ONLY a raw JSON array (even if just one document), no markdown, no extra text. Each element:\n{\"lastName\": \"surname as printed, hyphens replaced with space\", \"firstName\": \"given name(s) as printed, hyphens replaced with space\", \"dateOfBirth\": \"DD/MM/YYYY\", \"gender\": \"M or F\", \"nationality\": \"standard English country name: Switzerland/France/Germany/Poland/Italy/Austria/Spain/Belgium/Netherlands/United Kingdom/USA/Canada/Australia/Japan/China/Brazil etc\", \"birthCountry\": \"ONLY if different from nationality. If same country: empty string.\", \"birthPlaceName\": \"the town/city/comune of birth exactly as printed (luogo di nascita), empty string if not printed\", \"residencePlaceName\": \"ONLY the Italian comune of residence - leave this EMPTY unless the document proves residence is in ITALY specifically. On an Italian Carta d'Identita / IDELE this is the 'COMUNE DI ...' header at the top of the card (an Italian ID card is always issued by the holder's Italian comune of residence). Do NOT fill this from a foreign passport's 'Domicile/Residence' field even if a city is printed there - a French, German, etc. address is NOT an Italian comune and must be left EMPTY here regardless of what is printed.\", \"docType\": \"PASSAPORTO, CARTA D'IDENTITA, IDELE (electronic ID), PATENTE (driving licence), PASDI (diplomatic passport), PASSE (service passport), RIFUG (refugee travel document), or the exact Italian document type name as printed if none of these match\", \"docNumber\": \"exact document number as printed\", \"docIssuePlaceName\": \"the place of ISSUE of the document, as printed - used only for the group leader. For Carta d'Identita / IDELE this is the SAME comune as the 'COMUNE DI ...' header. For a driving licence (patente) an abbreviation like 'M.C. GE' (Motorizzazione Civile + province code) - transcribe exactly, do not expand. For a passport, the issuing authority/city/prefecture as printed. Empty string if not printed.\"}\nIMPORTANT: Return an ARRAY even for one person. Always use ONE consistent English country name. Deutschland=Germany, Polska=Poland, Suisse=Switzerland, Italia=Italy, Espana=Spain. Never mix languages. birthCountry must be empty string if it equals nationality. Replace ALL hyphens in names with a space. For birthPlaceName and docIssuePlaceName, transcribe exactly as printed (do not translate), leave empty if genuinely not present - never guess. residencePlaceName specifically must stay empty for any non-Italian document/address.";
     
     // Używamy TYLKO stabilnego modelu Lite
     fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
@@ -1578,12 +1583,7 @@ function runOcr(file,onDone){
       fillDocTypeFromHint(p.docType||"");
       document.getElementById("oDocNum").value=san(p.docNumber||"");
       fillComuneNascFromHint(p.birthPlaceName||"");
-      if(p.residencePlaceName){
-        if(!isIT(document.getElementById("oNat").value))document.getElementById("oResid").value="WŁOCHY";
-        fillComuneNascFromHintInto(document.getElementById("oComuneResid"),p.residencePlaceName);
-      } else {
-        fillComuneNascFromHintInto(document.getElementById("oComuneResid"),"");
-      }
+      fillResidenceFromHint(p.residencePlaceName||"");
       fillDocPlaceFromHint(p.docIssuePlaceName||"");
       refreshComuneVisibility();
       setOcrGender(p.gender||"");
@@ -2885,9 +2885,10 @@ function rezEditField(realIdx, field){
 }
 
 function rezBuildText(){
-  var filt=rezData.filter(function(ev){
-    var s=(ev.summary||"").toLowerCase();
-    return s.indexOf("not available")<0&&s.indexOf("unavailable")<0&&s.indexOf("blocked")<0&&s.indexOf("closed")<0;
+  var _t=new Date();_t.setHours(0,0,0,0);
+  var filt=filterRealReservations(rezData).filter(function(ev){
+    var yearOk=(_rezSelectedYear==="all")||(new Date(ev.start).getFullYear()===_rezSelectedYear);
+    return yearOk&&new Date(ev.end)>=_t;
   });
   var lines=["*🏠 Rezerwacje La Luna di Bastremoli*",""];
   lines.push("*Zameld.* | *Wymel.* | *Osoba* | *Kraj* | *Dor.* | *Dz.*");
@@ -2910,11 +2911,9 @@ function rezBuildText(){
 function rezShare(){
   // Generate table image via Canvas
   var _t=new Date();_t.setHours(0,0,0,0);
-  var filt=rezData.filter(function(ev){
-    var s=(ev.summary||"").toLowerCase();
-    var ok=s.indexOf("not available")<0&&s.indexOf("closed")<0&&s.indexOf("blocked")<0
-      &&s.indexOf("unavailable")<0&&s.indexOf("lodgify")<0&&s.indexOf("airbnb (not")<0;
-    return ok&&new Date(ev.end)>=_t;
+  var filt=filterRealReservations(rezData).filter(function(ev){
+    var yearOk=(_rezSelectedYear==="all")||(new Date(ev.start).getFullYear()===_rezSelectedYear);
+    return yearOk&&new Date(ev.end)>=_t;
   });
   if(!filt.length){appAlert("Brak rezerwacji do wysłania");return;}
 
@@ -4079,9 +4078,9 @@ async function ocrGo(){
       +'📅 '+(p.checkin||'—')+' → '+(p.checkout||'—');
 
     var choices=[];
+    var _realSet=new Set(filterRealReservations(rezData));
     rezData.forEach(function(ev,i){
-      var s=(ev.summary||'').toLowerCase();
-      var skip=s.indexOf('not available')>=0||s.indexOf('blocked')>=0||s.indexOf('lodgify')>=0||s.indexOf('closed')>=0;
+      var skip=!_realSet.has(ev);
       var endDate=new Date(ev.end);
       if(!skip&&!isNaN(endDate)&&endDate>=new Date()){
         var label=(ev.start||'').slice(0,10)+' → '+(ev.end||'').slice(0,10)+' | '+(ev._name||(ev.summary||'').replace(/\s*[-–].*$/,'').trim());
