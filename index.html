@@ -436,7 +436,7 @@ select.inp{cursor:pointer;}
         <input id="oDocNum" class="inp" style="letter-spacing:2px;text-transform:uppercase;font-family:'SF Mono','Menlo',monospace;"/>
       </div>
       <div class="field-group mb14">
-        <label class="field-lbl">Miejsce wydania dokumentu <span style="color:var(--text3);font-weight:400;">(gmina PL lub kraj — z dokumentu)</span></label>
+        <label class="field-lbl">Miejsce wydania dokumentu <span style="color:var(--text3);font-weight:400;">(potrzebne tylko dla lidera grupy — u pozostałych możesz zostawić puste)</span></label>
         <input id="oDocPlace" class="inp" placeholder="np. GENOVA albo POLSKA..." autocomplete="off"/>
         <div id="oDocPlaceList" class="comune-dropdown" style="display:none;"></div>
       </div>
@@ -580,9 +580,10 @@ select.inp{cursor:pointer;}
 
 <div class="screen" id="s-rezerwacje">
   <div class="topbar">
-    <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Sezon 2026</div></div>
+    <div><div class="topbar-title">Rezerwacje</div><div class="topbar-sub">Nadchodzące i trwające</div></div>
     <div style="display:flex;gap:8px;align-items:center;"><button onclick="rezStatsOpen()" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:#a78bfa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📊 Statystyki</button><button onclick="rezOcrOpen()" style="background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold2);font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;">📷 AI</button><button onclick="document.getElementById('rezCsvInput').click()" style="background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border-radius:10px;" title="Import CSV/tabeli">📥 CSV</button><input type="file" id="rezCsvInput" accept=".csv,.xlsx,.xls,image/*" style="display:none;" onchange="rezImportCsv(this)"/><button id="btnRezSync" onclick="rezSync()" style="background:transparent;border:none;color:var(--gold2);font-size:20px;cursor:pointer;padding:4px 6px;">&#x1f504;</button></div>
   </div>
+  <div id="rezYearChips" style="display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 14px;"></div>
   <div id="rezEmpty" style="text-align:center;padding:60px 20px;color:var(--text3);">
     <div style="font-size:48px;margin-bottom:12px;">&#x1f4c5;</div>
     <div style="font-size:15px;margin-bottom:8px;">Brak danych rezerwacji</div>
@@ -600,15 +601,11 @@ select.inp{cursor:pointer;}
   </div>
 </div>
 
-<div id="overlayWarnModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-  <div style="width:100%;max-width:400px;background:linear-gradient(180deg,#1a1410,#100c09);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:22px;">
-    <div style="font-size:17px;font-weight:700;color:#ef4444;margin-bottom:12px;">⚠ <span id="warnModalTitle"></span></div>
-    <div id="warnModalList" style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:12px;"></div>
-    <div id="warnModalNote" style="font-size:12.5px;color:var(--text3);margin-bottom:18px;"></div>
-    <div style="display:flex;gap:10px;">
-      <button id="warnModalCancel" class="btn btn-secondary" style="flex:1;">Anuluj</button>
-      <button id="warnModalProceed" class="btn" style="flex:1;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444;">Pobierz mimo to</button>
-    </div>
+<div id="overlayAppModal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="width:100%;max-width:400px;background:linear-gradient(180deg,#1a1410,#100c09);border:1px solid var(--border);border-radius:20px;padding:22px;">
+    <div id="appModalTitle" style="font-size:17px;font-weight:700;margin-bottom:12px;"></div>
+    <div id="appModalMsg" style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:18px;white-space:pre-line;"></div>
+    <div id="appModalBtns" style="display:flex;gap:10px;"></div>
   </div>
 </div>
 
@@ -883,7 +880,7 @@ var PROVINCE_CAPITALS={"AG":"AGRIGENTO","AL":"ALESSANDRIA","AN":"ANCONA","AO":"A
 // Rozpoznaje "MC GE" / "M.C. GE" / "MCTC MI" / "M.C.T.C. TO" itp. (skrót
 // urzędu Motorizzazione Civile + kod prowincji) i podstawia stolicę.
 function resolveMotorizzazioneAbbrev(text){
-  var m=String(text||"").trim().toUpperCase().match(/^M\.?\s?C\.?\s?T?\.?\s?C?\.?\s+([A-Z]{2})$/);
+  var m=String(text||"").trim().toUpperCase().match(/^M\.?\s?C\.?\s?T?\.?\s?C?\.?[\s\-.]+([A-Z]{2})$/);
   if(m&&PROVINCE_CAPITALS[m[1]])return {name:PROVINCE_CAPITALS[m[1]],prov:m[1]};
   return null;
 }
@@ -1003,6 +1000,41 @@ function resolveComuneInputAtSave(inputId,isComuneOnly){
 
 function normC(r){var k=String(r||"").toLowerCase().trim().replace(/[éèêë]/g,"e").replace(/[àâ]/g,"a").replace(/[ùû]/g,"u").replace(/œ/g,"oe").replace(/ü/g,"u").replace(/ö/g,"o").replace(/ä/g,"a").replace(/ß/g,"ss");return CM[k]||san(r).toUpperCase();}
 function isIT(r){return["italia","italy","italie","italien","ita","włochy","wlochy"].indexOf(String(r||"").toLowerCase().trim())>=0;}
+
+// ── Filtr "to nie jest prawdziwa rezerwacja" — JEDNO wspólne miejsce, użyte
+// wszędzie (baner dziś/jutro, tabela Rezerwacji, Statystyki, wybór rezerwacji
+// do zameldowania) — wcześniej były to 4 osobne, nieco inne kopie tej samej
+// logiki, co powodowało rozjazdy. Łapie dwa przypadki:
+// 1) Tekstowe blokady kalendarza ("Not available", "Closed period" itp.)
+// 2) "Preparation time" / bufor przed-po rezerwacji — platformy (Airbnb,
+//    Booking.com) wstawiają do iCal osobny, bardzo krótki wpis (zwykle
+//    dokładnie tyle dni, ile ustawiono w "czas na przygotowanie") doklejony
+//    BEZPOŚREDNIO do prawdziwej rezerwacji, czasem pod tą samą "nazwą" co
+//    gość — dlatego samego tekstu nie da się użyć jako jedynego kryterium.
+//    Rozpoznajemy to strukturalnie: wpis ≤1 noc, którego start/koniec styka
+//    się DOKŁADNIE z inną rezerwacją, bez żadnej przerwy — to podpis bufora.
+var BLOCK_TEXT_RE=/not.?avail|closed|blocked|unavailable|buffer|preparation|turnover|prep.?time|lodgify/i;
+function filterRealReservations(events){
+  var withDates=events.filter(function(e){return e.start&&e.end;});
+  var startsByDay={},endsByDay={};
+  withDates.forEach(function(e){
+    var sk=(e.start||"").slice(0,10),ek=(e.end||"").slice(0,10);
+    (startsByDay[sk]=startsByDay[sk]||[]).push(e);
+    (endsByDay[ek]=endsByDay[ek]||[]).push(e);
+  });
+  return withDates.filter(function(e){
+    if(BLOCK_TEXT_RE.test(e.summary||e._name||""))return false;
+    var s=new Date(e.start),en=new Date(e.end);
+    if(isNaN(s)||isNaN(en))return false;
+    var nights=Math.round((en-s)/86400000);
+    if(nights<1)return false; // wpis wadliwy
+    if(nights>1)return true; // dłuższe pobyty na pewno prawdziwe
+    var sk=(e.start||"").slice(0,10),ek=(e.end||"").slice(0,10);
+    var touchesBefore=(endsByDay[sk]||[]).some(function(o){return o!==e;});
+    var touchesAfter=(startsByDay[ek]||[]).some(function(o){return o!==e;});
+    return !(touchesBefore||touchesAfter); // 1-nocny wpis stykający się z inną rezerwacją = bufor
+  });
+}
 function getNC(c){return NC[String(c||"").toUpperCase()]||"000000000";}
 function uid(){return Math.random().toString(36).slice(2);}
 
@@ -1035,19 +1067,46 @@ var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje","karty"];
 // Historia nawigacji — przycisk wstecz nie wyrzuca z apki
 // Overlay IDs które mogą być otwarte i powinny być zamknięte przez "wstecz"
-var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayWarnModal"];
+var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayAppModal"];
 
-function showWarnModal(title,items,note,onProceed){
-  document.getElementById("warnModalTitle").textContent=title;
-  document.getElementById("warnModalList").innerHTML=items.map(function(x){return "• "+x;}).join("<br>");
-  document.getElementById("warnModalNote").textContent=note||"";
-  var ov=document.getElementById("overlayWarnModal");
+// ── System okienek w stylu apki — zamiennik natywnych alert()/confirm(),
+// które w przeglądarce pokazują brzydki "Komunikat ze strony ...". ──
+function _appModalShow(title,msg,titleColor,buttons){
+  var titleEl=document.getElementById("appModalTitle");
+  titleEl.textContent=title;titleEl.style.color=titleColor;
+  document.getElementById("appModalMsg").textContent=msg;
+  var btnWrap=document.getElementById("appModalBtns");
+  btnWrap.innerHTML="";
+  var ov=document.getElementById("overlayAppModal");
+  function cleanup(){ov.style.display="none";}
+  buttons.forEach(function(b){
+    var btn=document.createElement("button");
+    btn.textContent=b.label;
+    btn.className="btn"+(b.secondary?" btn-secondary":"");
+    btn.style.flex="1";
+    if(b.danger)btn.style.cssText+="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444;";
+    else if(!b.secondary)btn.style.cssText+="background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.4);color:var(--gold2);";
+    btn.onclick=function(){cleanup();if(b.onClick)b.onClick();};
+    btnWrap.appendChild(btn);
+  });
   ov.style.display="flex";
-  var cancelBtn=document.getElementById("warnModalCancel");
-  var proceedBtn=document.getElementById("warnModalProceed");
-  function cleanup(){ov.style.display="none";cancelBtn.onclick=null;proceedBtn.onclick=null;}
-  cancelBtn.onclick=function(){cleanup();};
-  proceedBtn.onclick=function(){cleanup();onProceed();};
+}
+function appAlert(msg,isError){
+  _appModalShow(isError?"⚠ Uwaga":"ℹ️ Informacja",msg,isError?"#ef4444":"var(--gold2)",[{label:"OK"}]);
+}
+function appConfirm(msg,onYes,opts){
+  opts=opts||{};
+  _appModalShow(opts.title||"Potwierdź","⚠ "+msg,"#ef4444",[
+    {label:opts.cancelLabel||"Anuluj",secondary:true},
+    {label:opts.yesLabel||"Usuń",danger:true,onClick:onYes}
+  ]);
+}
+function showWarnModal(title,items,note,onProceed){
+  var msg=items.map(function(x){return "• "+x;}).join("\n")+(note?"\n\n"+note:"");
+  _appModalShow("⚠ "+title,msg,"#ef4444",[
+    {label:"Anuluj",secondary:true},
+    {label:"Pobierz mimo to",danger:true,onClick:onProceed}
+  ]);
 }
 function closeTopOverlay(){
   // Zamknij pierwszy widoczny overlay od góry (najwyższy z-index ostatni w liście)
@@ -1117,7 +1176,7 @@ document.getElementById("btnSettings").addEventListener("click",openSettings);
 document.getElementById("btnCloseSettings").addEventListener("click",closeSettings);
 document.getElementById("btnSaveKey").addEventListener("click",function(){
   var k=document.getElementById("inpApiKey").value.trim();
-  if(!k){alert("Podaj klucz API");return;}
+  if(!k){appAlert("Podaj klucz API");return;}
   localStorage.setItem("r1000_key",k);
   document.getElementById("keySaved").style.display="block";
   setTimeout(function(){document.getElementById("keySaved").style.display="none";},2500);
@@ -1387,12 +1446,12 @@ function txRunAI(text,gtype,onDone){
 
 document.getElementById("btnProcess").addEventListener("click",function(){
   var text=document.getElementById("taGuests").value.trim();
-  if(!text){alert("Wklej dane gości");return;}
+  if(!text){appAlert("Wklej dane gości");return;}
   var gtype=document.getElementById("selGtype").value;
   var btn=this;btn.disabled=true;var oldTxt=btn.textContent;btn.textContent="Analizuję...";
   txRunAI(text,gtype,function(){
     btn.disabled=false;btn.textContent=oldTxt;
-    if(guests.length===0){alert("Nie rozpoznano żadnych gości. Sprawdź format danych.");return;}
+    if(guests.length===0){appAlert("Nie rozpoznano żadnych gości. Sprawdź format danych.");return;}
     showScreen("lista");
   });
 });
@@ -1427,6 +1486,12 @@ function processOcrQueue(){
     fillDocTypeFromHint(pp.docType||"");
     document.getElementById("oDocNum").value=san(pp.docNumber||"");
     fillComuneNascFromHint(pp.birthPlaceName||"");
+    if(pp.residencePlaceName){
+      if(!isIT(document.getElementById("oNat").value))document.getElementById("oResid").value="WŁOCHY";
+      fillComuneNascFromHintInto(document.getElementById("oComuneResid"),pp.residencePlaceName);
+    } else {
+      fillComuneNascFromHintInto(document.getElementById("oComuneResid"),"");
+    }
     fillDocPlaceFromHint(pp.docIssuePlaceName||"");
     refreshComuneVisibility();
     setOcrGender(pp.gender||"");
@@ -1480,7 +1545,7 @@ function runOcr(file,onDone){
     var mt=file.type||"image/jpeg";
     if(mt==="image/heic"||mt==="image/heif")mt="image/jpeg";
     
-    var prompt="This image may contain ONE or MORE identity documents. Return ONLY a raw JSON array (even if just one document), no markdown, no extra text. Each element:\n{\"lastName\":\"surname as printed, hyphens replaced with space\",\"firstName\":\"given name(s) as printed, hyphens replaced with space\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"standard English country name: Switzerland/France/Germany/Poland/Italy/Austria/Spain/Belgium/Netherlands/United Kingdom/USA/Canada/Australia/Japan/China/Brazil etc\",\"birthCountry\":\"ONLY if different from nationality. If same country: empty string.\",\"birthPlaceName\":\"the town/city/comune of birth exactly as printed on the document (e.g. luogo di nascita), empty string if not printed\",\"docType\":\"PASSAPORTO, CARTA D'IDENTITA, IDELE (electronic ID), PATENTE (driving licence), PASDI (diplomatic passport), PASSE (service passport), RIFUG (refugee travel document), or the exact Italian document type name as printed if none of these match\",\"docNumber\":\"exact document number as printed\",\"docIssuePlaceName\":\"the place of issue of the document exactly as printed (e.g. luogo di rilascio / rilasciata da / comune), empty string if not printed\"}\nIMPORTANT: Return an ARRAY even for one person. Always use ONE consistent English country name. Deutschland=Germany, Polska=Poland, Suisse=Switzerland, Italia=Italy, Espana=Spain. Never mix languages. birthCountry must be empty string if it equals nationality. Replace ALL hyphens in names with a space. For birthPlaceName and docIssuePlaceName, transcribe the town/comune name exactly as printed (do not translate it), leave empty if genuinely not present on the document — never guess.";
+    var prompt="This image may contain ONE or MORE identity documents. Return ONLY a raw JSON array (even if just one document), no markdown, no extra text. Each element:\n{\"lastName\":\"surname as printed, hyphens replaced with space\",\"firstName\":\"given name(s) as printed, hyphens replaced with space\",\"dateOfBirth\":\"DD/MM/YYYY\",\"gender\":\"M or F\",\"nationality\":\"standard English country name: Switzerland/France/Germany/Poland/Italy/Austria/Spain/Belgium/Netherlands/United Kingdom/USA/Canada/Australia/Japan/China/Brazil etc\",\"birthCountry\":\"ONLY if different from nationality. If same country: empty string.\",\"birthPlaceName\":\"the town/city/comune of birth exactly as printed (luogo di nascita), empty string if not printed\",\"residencePlaceName\":\"the town/comune of CURRENT RESIDENCE. On an Italian Carta d'Identita this is the 'COMUNE DI ...' header at the very top of the card (the municipality that issued it — by Italian law an ID card is always issued by your comune of residence), OR the comune named in 'indirizzo di residenza' on the back if visible. On other documents (passport, driving licence) leave this empty unless residence is explicitly printed.\",\"docType\":\"PASSAPORTO, CARTA D'IDENTITA, IDELE (electronic ID), PATENTE (driving licence), PASDI (diplomatic passport), PASSE (service passport), RIFUG (refugee travel document), or the exact Italian document type name as printed if none of these match\",\"docNumber\":\"exact document number as printed\",\"docIssuePlaceName\":\"the place of ISSUE of the document. For Carta d'Identita / IDELE this is the SAME comune as the 'COMUNE DI ...' header — repeat the same value as residencePlaceName. For a driving licence (patente) this is the issuing office as printed, often an abbreviation like 'M.C. GE' or 'MCTC TO' (Motorizzazione Civile + province code) — transcribe it exactly as printed, do not expand it. For a passport, the issuing authority/city as printed. Empty string if not printed.\"}\nIMPORTANT: Return an ARRAY even for one person. Always use ONE consistent English country name. Deutschland=Germany, Polska=Poland, Suisse=Switzerland, Italia=Italy, Espana=Spain. Never mix languages. birthCountry must be empty string if it equals nationality. Replace ALL hyphens in names with a space. For birthPlaceName, residencePlaceName and docIssuePlaceName, transcribe exactly as printed (do not translate), leave empty if genuinely not present — never guess.";
     
     // Używamy TYLKO stabilnego modelu Lite
     fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
@@ -1513,6 +1578,12 @@ function runOcr(file,onDone){
       fillDocTypeFromHint(p.docType||"");
       document.getElementById("oDocNum").value=san(p.docNumber||"");
       fillComuneNascFromHint(p.birthPlaceName||"");
+      if(p.residencePlaceName){
+        if(!isIT(document.getElementById("oNat").value))document.getElementById("oResid").value="WŁOCHY";
+        fillComuneNascFromHintInto(document.getElementById("oComuneResid"),p.residencePlaceName);
+      } else {
+        fillComuneNascFromHintInto(document.getElementById("oComuneResid"),"");
+      }
       fillDocPlaceFromHint(p.docIssuePlaceName||"");
       refreshComuneVisibility();
       setOcrGender(p.gender||"");
@@ -1696,8 +1767,16 @@ function renderLista(){
       html+='<div style="font-size:11px;color:var(--gold);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Documento</div>';
       html+='<select class="inp" data-gid="'+g.id+'" data-field="docType" style="font-size:14px;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';">';
       html+='<option value="">— tipo documento —</option>';
-      var dt=["PASSAPORTO","CARTA D'IDENTITA","IDELE","PATENTE","PASDI"];
+      var dt=["PASSAPORTO","CARTA D'IDENTITA","IDELE","PATENTE","PASDI","PASSE","RIFUG"];
       for(var di=0;di<dt.length;di++)html+='<option value="'+dt[di]+'"'+(g.docType===dt[di]?" selected":"")+'>'+dt[di]+'</option>';
+      // g.docType może być też surowym 5-znakowym kodem z pełnej listy 95 typów
+      // (gdy AI zwróciło pełną włoską nazwę zamiast krótkiego słowa-klucza) —
+      // dopisz go dynamicznie, żeby dropdown nigdy nie pokazywał pusto mimo
+      // poprawnie zapisanych danych.
+      if(g.docType&&dt.indexOf(g.docType)<0){
+        var docRow=DOCUMENTI_DATA.find(function(r){return r[0]===g.docType;});
+        html+='<option value="'+g.docType+'" selected>'+(docRow?docRow[1]+" ("+docRow[0]+")":g.docType)+'</option>';
+      }
       html+='</select>';
       html+='<input class="inp" data-gid="'+g.id+'" data-field="docNumber" value="'+(g.docNumber||"")+'" placeholder="Numero documento" style="letter-spacing:2px;font-family:\'SF Mono\',monospace;font-size:14px;text-transform:uppercase;background:'+(mis?'rgba(239,68,68,.08)':'var(--card2)')+';" />';
       html+='</div>';
@@ -2089,7 +2168,7 @@ function rzRenderGroups(){
 
 document.getElementById("btnRzAddGroup").addEventListener("click",function(){
   var n=(document.getElementById("rz-newName").value||"").trim();
-  if(!n){alert("Wpisz imi\u0119 lidera");return;}
+  if(!n){appAlert("Wpisz imi\u0119 lidera");return;}
   rzGroups.push({name:n,count:1});
   document.getElementById("rz-newName").value="";
   rzRenderGroups();
@@ -2104,7 +2183,7 @@ document.getElementById("btnRzLoad").addEventListener("click",function(){
     grps[gid].count++;
   }
   var keys=Object.keys(grps);
-  if(!keys.length){alert("Brak zameldowanych go\u015Bci");return;}
+  if(!keys.length){appAlert("Brak zameldowanych go\u015Bci");return;}
   rzGroups=keys.map(function(k){return grps[k];});
   rzRenderGroups();
 });
@@ -2123,7 +2202,7 @@ document.getElementById("btnRzAddExtra").addEventListener("click",function(){
   var n=(document.getElementById("rz-eName").value||"").trim();
   var a=parseFloat(document.getElementById("rz-eAmt").value);
   var s=parseInt(document.getElementById("rz-eSign").value);
-  if(!n||isNaN(a)||a<=0){alert("Uzupe\u0142nij opis i kwot\u0119");return;}
+  if(!n||isNaN(a)||a<=0){appAlert("Uzupe\u0142nij opis i kwot\u0119");return;}
   rzExtras.push({desc:n,amt:a,sign:s});
   document.getElementById("rz-eName").value="";document.getElementById("rz-eAmt").value="";
   rzRenderExtras();
@@ -2161,20 +2240,21 @@ function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
 }
 
 function rzDeleteEntry(i){
-  if(!confirm("Usunąć ten wpis z rozliczenia?"))return;
-  var data=rzLoad();
-  // Calculate delta that this entry contributed
-  var prevSaldo=i>0?data.entries[i-1].saltoAfter:0;
-  var delta=data.entries[i].saltoAfter-prevSaldo;
-  // Remove the entry
-  data.entries.splice(i,1);
-  // Subtract delta from all subsequent entries
-  for(var j=i;j<data.entries.length;j++){
-    data.entries[j].saltoAfter=r2(data.entries[j].saltoAfter-delta);
-  }
-  data.saldo=data.entries.length?data.entries[data.entries.length-1].saltoAfter:0;
-  rzSave(data);
-  rzRefreshHistory();
+  appConfirm("Usunąć ten wpis z rozliczenia?",function(){
+    var data=rzLoad();
+    // Calculate delta that this entry contributed
+    var prevSaldo=i>0?data.entries[i-1].saltoAfter:0;
+    var delta=data.entries[i].saltoAfter-prevSaldo;
+    // Remove the entry
+    data.entries.splice(i,1);
+    // Subtract delta from all subsequent entries
+    for(var j=i;j<data.entries.length;j++){
+      data.entries[j].saltoAfter=r2(data.entries[j].saltoAfter-delta);
+    }
+    data.saldo=data.entries.length?data.entries[data.entries.length-1].saltoAfter:0;
+    rzSave(data);
+    rzRefreshHistory();
+  });
 }
 
 function rzRefreshHistory(){
@@ -2238,7 +2318,7 @@ function rzCommit(){
   var pcEl=document.getElementById("rz-poolC");
   var pca=parseFloat(pcEl.value);var usePC=!isNaN(pca)&&pcEl.dataset.m==="1";
   var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
-  if(!lines.length){alert("Dodaj grupy gości lub inne pozycje");return false;}
+  if(!lines.length){appAlert("Dodaj grupy gości lub inne pozycje");return false;}
   var data=rzLoad();
 
   // Goście i "Inne" trafiają jako OSOBNE wpisy (nawet jeśli dodane w tym
@@ -2303,12 +2383,12 @@ function rzFullText(){
 
 document.getElementById("btnRzShare").addEventListener("click",function(){
   if(rzGroups.length||rzExtras.length){if(!rzCommit())return;}
-  var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
+  var data=rzLoad();if(!data.entries.length){appAlert("Brak danych");return;}
   window.open("https://wa.me/?text="+encodeURIComponent(rzFullText()),"_blank");
 });
 document.getElementById("btnRzCopy").addEventListener("click",function(){
   if(rzGroups.length||rzExtras.length)rzCommit();
-  var data=rzLoad();if(!data.entries.length){alert("Brak danych");return;}
+  var data=rzLoad();if(!data.entries.length){appAlert("Brak danych");return;}
   var txt=rzFullText();
   var ok=document.getElementById("rz-copyOk");
   function showOk(){if(ok){ok.style.display="block";setTimeout(function(){ok.style.display="none";},2500);}}
@@ -2316,12 +2396,13 @@ document.getElementById("btnRzCopy").addEventListener("click",function(){
   else{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);showOk();}
 });
 document.getElementById("btnRzReset").addEventListener("click",function(){
-  if(!confirm("Wyczy\u015Bci\u0107 ca\u0142e rozliczenie roku?"))return;
-  localStorage.removeItem(RZ_KEY);rzGroups=[];rzExtras=[];
-  document.getElementById("rz-poolH").value="";document.getElementById("rz-poolC").value="";
-  document.getElementById("rz-cleaning").checked=true;
-  document.getElementById("rz-cleaningTog").style.background="#c9a96e";
-  rzRenderGroups();rzRenderExtras();rzRefreshHistory();
+  appConfirm("Wyczyścić całe rozliczenie roku?",function(){
+    localStorage.removeItem(RZ_KEY);rzGroups=[];rzExtras=[];
+    document.getElementById("rz-poolH").value="";document.getElementById("rz-poolC").value="";
+    document.getElementById("rz-cleaning").checked=true;
+    document.getElementById("rz-cleaningTog").style.background="#c9a96e";
+    rzRenderGroups();rzRenderExtras();rzRefreshHistory();
+  });
 });
 
 // Callbacki rozliczenia obsługiwane w showScreen
@@ -2337,19 +2418,19 @@ function getServer(){return localStorage.getItem("push_server")||"";}
 
 async function testPush(){
   var server = getServer();
-  if(!server){ alert('Brak adresu serwera — ustaw go najpierw wyżej.'); return; }
+  if(!server){ appAlert('Brak adresu serwera — ustaw go najpierw wyżej.'); return; }
   var status = document.getElementById('kvSyncStatus');
   if(status) status.textContent = 'Wysyłam testowe powiadomienie...';
   try {
     var r = await fetch(server + '/api/test-push', { cache: 'no-store' });
     var dd = await r.json();
     if(dd.ok){
-      alert('✅ ' + dd.msg);
+      appAlert('✅ ' + dd.msg);
     } else {
-      alert('❌ Błąd na etapie "' + dd.step + '":\n' + dd.error);
+      appAlert('❌ Błąd na etapie "' + dd.step + '":\n' + dd.error);
     }
   } catch(e){
-    alert('❌ Nie udało się nawet połączyć z serwerem: ' + e.message);
+    appAlert('❌ Nie udało się nawet połączyć z serwerem: ' + e.message);
   }
   if(status) status.textContent = '';
 }
@@ -2373,7 +2454,7 @@ async function icalSync(){
   var inp=document.getElementById("icalUrlInput");
   var url=(inp?inp.value:"").trim()||localStorage.getItem("ical_url")||"";
   if(inp&&!inp.value&&url)inp.value=url;
-  if(!url){alert("Wklej link iCal w ustawieniach");return;}
+  if(!url){appAlert("Wklej link iCal w ustawieniach");return;}
   localStorage.setItem("ical_url",url);
   var st=document.getElementById("icalStatus");
   if(st){st.style.color="var(--gold2)";st.textContent="Synchronizuję...";}
@@ -2449,12 +2530,9 @@ function renderTodayBanner(){
   var today = new Date(); var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
   var todayKey = dayKey(today), tomKey = dayKey(tomorrow);
 
-  var BLOCKED_RE = /closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
   var rows = [];
-  data.forEach(function(ev){
-    if(!ev.start || !ev.end) return;
+  filterRealReservations(data).forEach(function(ev){
     var name = ev._name || ev.summary || 'Gość';
-    if(BLOCKED_RE.test(name)) return; // bloki "Closed Period" itp. — to nie gość
     var sKey = dayKey(ev.start), eKey = dayKey(ev.end);
     if(sKey===todayKey) rows.push({icon:'🟢',label:'Dziś przyjazd',name:name,ord:0});
     else if(sKey===tomKey) rows.push({icon:'🟢',label:'Jutro przyjazd',name:name,ord:1});
@@ -2560,24 +2638,17 @@ function rezSync(){
 // Wiarygodność:
 // 1) Anulowane rezerwacje same znikają z rez_cache przy każdej synchronizacji
 //    (rezSync buduje "merged" WYŁĄCZNIE z tego, co iCal zwraca teraz — patrz
-//    komentarz w rezSync), więc tu nie trzeba już nic filtrować pod tym
-//    kątem — ale i tak dodatkowo odsiewamy wpisy bez dat.
-// 2) Bloki "Closed Period" / "Not available" (Airbnb/Booking wstawiają je do
-//    iCal jako fejkowe "rezerwacje") są wycinane tym samym wzorcem, którego
-//    apka już używa na ekranie głównym (BLOCKED_RE).
+//    komentarz w rezSync), więc tu nie trzeba już nic filtrować pod tym kątem.
+// 2) Blokady kalendarza i bufory "preparation time" są wycinane wspólną
+//    funkcją filterRealReservations (patrz definicja przy isIT) — tej samej,
+//    której używa cała reszta apki.
 // 3) Duplikaty po UID są odsiewane przez Map — każdy UID liczy się raz,
 //    niezależnie ile razy mógłby się powtórzyć w cache.
 function rezStatsGetClean(){
-  var BLOCKED_RE=/closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
   var byUid=new Map();
-  rezData.forEach(function(ev){
-    if(!ev.start||!ev.end)return;
-    var name=ev._name||ev.summary||"";
-    if(BLOCKED_RE.test(name))return;
+  filterRealReservations(rezData).forEach(function(ev){
     var s=new Date(ev.start),e=new Date(ev.end);
-    if(isNaN(s)||isNaN(e))return;
     var nights=Math.round((e-s)/86400000);
-    if(nights<1)return; // wpis wadliwy (0 lub ujemne noce) — nie liczymy
     var key=ev.uid||(ev.start+"_"+ev.end); // brak uid (np. ręczne wpisy) -> klucz zastępczy
     if(!byUid.has(key))byUid.set(key,{start:s,end:e,nights:nights});
   });
@@ -2662,6 +2733,23 @@ function rezStatsShowYear(year){
   bEl.innerHTML=html;
 }
 
+var _rezSelectedYear="all"; // "all" albo konkretny rok (np. 2027) — przełącznik nad tabelą
+function rezRenderYearChips(){
+  var chipsEl=document.getElementById("rezYearChips");
+  if(!chipsEl)return;
+  var real=filterRealReservations(rezData);
+  var _today=new Date();_today.setHours(0,0,0,0);
+  var upcoming=real.filter(function(ev){var e=new Date(ev.end);return !isNaN(e)&&e>=_today;});
+  var years=Array.from(new Set(upcoming.map(function(ev){return new Date(ev.start).getFullYear();}))).sort(function(a,b){return a-b;});
+  if(years.length<2){chipsEl.innerHTML="";return;} // jeden rok = przełącznik niepotrzebny
+  var chips=['<button onclick="rezSetYear(\'all\')" class="rez-year-chip" style="padding:7px 14px;border-radius:10px;border:1px solid rgba(201,169,110,.3);background:'+(_rezSelectedYear==="all"?'rgba(201,169,110,.18)':'transparent')+';color:'+(_rezSelectedYear==="all"?'var(--gold2)':'var(--text2)')+';font-size:13px;font-weight:600;cursor:pointer;">Wszystkie</button>'];
+  years.forEach(function(y){
+    chips.push('<button onclick="rezSetYear('+y+')" class="rez-year-chip" style="padding:7px 14px;border-radius:10px;border:1px solid rgba(201,169,110,.3);background:'+(_rezSelectedYear===y?'rgba(201,169,110,.18)':'transparent')+';color:'+(_rezSelectedYear===y?'var(--gold2)':'var(--text2)')+';font-size:13px;font-weight:600;cursor:pointer;">'+y+'</button>');
+  });
+  chipsEl.innerHTML=chips.join("");
+}
+function rezSetYear(y){_rezSelectedYear=(y==="all")?"all":Number(y);rezRender();}
+
 function rezRender(){
   renderTodayBanner();
   // Zawsze czytaj świeżo z localStorage — to jest jedyne źródło prawdy
@@ -2686,19 +2774,17 @@ function rezRender(){
   try{localStorage.setItem("rez_cache",JSON.stringify(rezData));}catch(e){}
 
   var _today=new Date();_today.setHours(0,0,0,0);
+  var _realSet=new Set(filterRealReservations(rezData));
   var _rezFiltered=[];
   var _rezFilteredIdx=[]; // oryginalne indeksy w rezData
-  var curYear=new Date().getFullYear();
   for(var fi=0;fi<rezData.length;fi++){
     var ev=rezData[fi];
-    var s=(ev.summary||"").toLowerCase();
-    var ok=s.indexOf("not available")<0&&s.indexOf("unavailable")<0
-      &&s.indexOf("blocked")<0&&s.indexOf("closed")<0
-      &&s.indexOf("airbnb (not")<0&&s.indexOf("lodgify")<0;
     var endDate=new Date(ev.end);
     var notOld=!isNaN(endDate)&&endDate>=_today;
-    if(ok&&notOld){_rezFiltered.push(ev);_rezFilteredIdx.push(fi);}
+    var yearOk=(_rezSelectedYear==="all")||(new Date(ev.start).getFullYear()===_rezSelectedYear);
+    if(_realSet.has(ev)&&notOld&&yearOk){_rezFiltered.push(ev);_rezFilteredIdx.push(fi);}
   }
+  rezRenderYearChips();
 
   var empty=document.getElementById("rezEmpty");
   var wrap=document.getElementById("rezTableWrap");
@@ -2745,11 +2831,12 @@ function rezRender(){
 }
 
 function rezDelete(realIdx){
-  if(!confirm("Usuń tę rezerwację z listy?"))return;
-  try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
-  rezData.splice(realIdx,1);
-  localStorage.setItem("rez_cache",JSON.stringify(rezData));
-  rezRender();
+  appConfirm("Usuń tę rezerwację z listy?",function(){
+    try{var c=localStorage.getItem("rez_cache");if(c)rezData=JSON.parse(c);}catch(e){}
+    rezData.splice(realIdx,1);
+    localStorage.setItem("rez_cache",JSON.stringify(rezData));
+    rezRender();
+  });
 }
 
 function rezEdit(realIdx){
@@ -2829,7 +2916,7 @@ function rezShare(){
       &&s.indexOf("unavailable")<0&&s.indexOf("lodgify")<0&&s.indexOf("airbnb (not")<0;
     return ok&&new Date(ev.end)>=_t;
   });
-  if(!filt.length){alert("Brak rezerwacji do wysłania");return;}
+  if(!filt.length){appAlert("Brak rezerwacji do wysłania");return;}
 
   var COLS=["Zameldowanie","Wymeldowanie","Osoba rezerwująca","Kraj","Dor.","Dz."];
   var rows=filt.map(function(ev){
@@ -2979,7 +3066,7 @@ function rezCopy(){
 // ================================================================
 function saveServerInput(){
   var v=(document.getElementById("serverInput").value||"").trim().replace(/\/$/,"");
-  if(!v){alert("Wpisz adres serwera");return;}
+  if(!v){appAlert("Wpisz adres serwera");return;}
   localStorage.setItem("push_server",v);
   var ps=document.getElementById("pushStatus");
   if(ps){ps.textContent="✓ Adres zapisany: "+v;ps.style.color="#4ade80";}
@@ -2987,7 +3074,7 @@ function saveServerInput(){
 
 function frSave(){
   var srv=(document.getElementById("frServer").value||"").trim().replace(/\/$/,"");
-  if(!srv){alert("Wpisz adres serwera");return;}
+  if(!srv){appAlert("Wpisz adres serwera");return;}
   localStorage.setItem("push_server",srv);
   var ic=(document.getElementById("frIcal").value||"").trim();
   if(ic){localStorage.setItem("ical_url",ic);var ii=document.getElementById("icalUrlInput");if(ii)ii.value=ic;}
@@ -3018,7 +3105,7 @@ document.getElementById("btnRzHistory").addEventListener("click",function(){
   // stare wpisy z rozliczeń, których jeszcze nie ma na liście meldunkowej.
   var hist=meldHist.slice();
   rzHist.forEach(function(n){if(hist.indexOf(n)<0)hist.push(n);});
-  if(!hist.length){alert("Brak historii — zamelduj gości albo dodaj kilka rozliczeń najpierw");return;}
+  if(!hist.length){appAlert("Brak historii — zamelduj gości albo dodaj kilka rozliczeń najpierw");return;}
   pk.innerHTML="";
   hist.forEach(function(name){
     var b=document.createElement("button");
@@ -3227,12 +3314,13 @@ function overlayKartaClose(){
 }
 
 function kartyDelete(i){
-  if(!confirm("Usunąć tę kartę?"))return;
-  var cards=kartyLoad();
-  cards.splice(i,1);
-  kartySaveAll(cards);
-  overlayKartaClose();
-  kartyRender();
+  appConfirm("Usunąć tę kartę?",function(){
+    var cards=kartyLoad();
+    cards.splice(i,1);
+    kartySaveAll(cards);
+    overlayKartaClose();
+    kartyRender();
+  });
 }
 
 function kartyAdd(){
@@ -3289,8 +3377,8 @@ function kartyImgSelected(input){
 
 function kartySave(){
   var name=(document.getElementById("kartyAddName").value||"").trim();
-  if(!name){alert("Wpisz nazwę karty");return;}
-  if(!_kartyAddImgData){alert("Dodaj zdjęcie kodu");return;}
+  if(!name){appAlert("Wpisz nazwę karty");return;}
+  if(!_kartyAddImgData){appAlert("Dodaj zdjęcie kodu");return;}
   var cards=kartyLoad();
   cards.push({name:name,img:_kartyAddImgData,added:Date.now()});
   // Zapisz do IDB (bez limitu) i localStorage
@@ -3764,7 +3852,7 @@ function rezImportCsv(input){
   reader.onload=function(e){
     var text=e.target.result;
     var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
-    if(lines.length<2){alert('Plik jest pusty lub ma tylko nagłówki');return;}
+    if(lines.length<2){appAlert('Plik jest pusty lub ma tylko nagłówki');return;}
     var sep=lines[0].indexOf(';')>lines[0].indexOf(',')?';':',';
     // Spróbuj też tab
     var tabCount=(lines[0].match(/\t/g)||[]).length;
@@ -3823,7 +3911,7 @@ function rezImportCsv(input){
     var colInfo=Object.keys(colMap).map(function(k){return k+'='+colMap[k];}).join(', ')||'BRAK KOLUMN';
     var msg='✓ Zaimportowano '+imported+' rezerwacji'+(skipped?' (pominięto '+skipped+')':'')+'.\nWykryte kolumny: '+colInfo;
     if(imported===0)msg+='.\n\nNagłówki pliku:\n'+headers.slice(0,10).join(' | ');
-    alert(msg);
+    appAlert(msg);
   };
   reader.readAsText(file,'UTF-8');
 }
@@ -4048,14 +4136,9 @@ function rezPickCandidates(){
   var raw=[];
   try{var c=localStorage.getItem("rez_cache");if(c)raw=JSON.parse(c);}catch(e){}
   var today=new Date();today.setHours(0,0,0,0);
-  var BLOCKED_RE=/closed|not available|unavailable|blocked|airbnb \(not|booking\.com \(not/i;
-  return raw.filter(function(ev){
-    if(!ev.start||!ev.end)return false;
-    var name=ev._name||ev.summary||"";
-    if(BLOCKED_RE.test(name))return false;
+  return filterRealReservations(raw).filter(function(ev){
     var e=new Date(ev.end);
-    if(isNaN(e)||e<today)return false; // pokazujemy tylko aktualne/nadchodzące
-    return true;
+    return !isNaN(e)&&e>=today; // pokazujemy tylko aktualne/nadchodzące
   }).sort(function(a,b){return new Date(a.start)-new Date(b.start);});
 }
 function rezPickFmt(iso){var d=new Date(iso);return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();}
