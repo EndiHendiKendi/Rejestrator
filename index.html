@@ -2083,7 +2083,7 @@ document.getElementById("btnDownloadQuestura").addEventListener("click",function
     if(isIT(birthCtry)&&!g.birthComuneCode){
       missing.push((g.firstName+" "+g.lastName).trim()+" — brak comune urodzenia");
     }
-    if(g.isLeader&&!g.docIssuePlace){
+    if(g.isLeader&&isIT(birthCtry)&&!g.docIssuePlace){
       missing.push((g.firstName+" "+g.lastName).trim()+" — brak miejsca wydania dokumentu");
     }
   });
