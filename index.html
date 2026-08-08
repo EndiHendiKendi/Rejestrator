@@ -886,19 +886,102 @@ function resolveMotorizzazioneAbbrev(text){
 }
 
 function fillComuneNascFromHint(name){fillComuneNascFromHintInto(document.getElementById("oComuneNasc"),name);}
-function fillComuneNascFromHintInto(inp,name){
-  delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
-  if(!name){inp.value="";return;}
+// ═══════════════════════════════════════════════════════════════════════
+// PURE RESOLWERY — jedno źródło prawdy używane przez WSZYSTKIE ścieżki
+// wprowadzania gości (skan zdjęcia, wklejenie tekstu przez AI, parsery
+// zapasowe, edycja) — żeby nigdy więcej nie było tak, że jedna ścieżka ma
+// poprawną walidację, a inna wcale (to był realny powód złego "DNI" w
+// pliku i pustego miejsca wydania — dane wklejone tekstem omijały całą
+// logikę sprawdzającą, bo szły inną drogą w kodzie niż skan zdjęcia).
+// ═══════════════════════════════════════════════════════════════════════
+var KNOWN_DOC_TYPES=["PASSAPORTO","CARTA D'IDENTITA","IDELE","PATENTE","PASDI","PASSE","RIFUG"];
+
+function resolveComuneMatch(name){
+  if(!name)return null;
   var q=String(name).trim().toUpperCase();
   var exact=COMUNI_DATA.filter(function(r){return r[1]===q;});
   exact.sort(function(a,b){return a[3]-b[3];});
-  if(exact.length){inp.value=exact[0][1];inp.dataset.code=exact[0][0];inp.dataset.prov=exact[0][2];return;}
+  if(exact.length)return {code:exact[0][0],prov:exact[0][2],name:exact[0][1]};
   var abbr=resolveMotorizzazioneAbbrev(q);
   if(abbr){
     var byName=COMUNI_DATA.filter(function(r){return r[1]===abbr.name&&r[2]===abbr.prov;});
     byName.sort(function(a,b){return a[3]-b[3];});
-    if(byName.length){inp.value=byName[0][1];inp.dataset.code=byName[0][0];inp.dataset.prov=byName[0][2];return;}
+    if(byName.length)return {code:byName[0][0],prov:byName[0][2],name:byName[0][1]};
   }
+  return null;
+}
+// Typ dokumentu: zwraca albo znany "przyjazny" klucz (PASSAPORTO itd.),
+// albo prawdziwy 5-znakowy kod z pełnej listy 95 typów, albo null.
+// NIGDY nie zwraca surowego, niezweryfikowanego tekstu (np. "DNI") — to
+// jest gwarancja, że plik do Questury/Ross1000 nigdy nie dostanie
+// nieznanego kodu, który psuje CAŁY plik (jeden zły wiersz lidera potrafi
+// unieważnić wszystkich pozostałych gości w zgłoszeniu).
+function resolveDocTypeMatch(text){
+  if(!text)return null;
+  var t=String(text).trim().toUpperCase();
+  if(KNOWN_DOC_TYPES.indexOf(t)>-1)return {code:t,label:t};
+  var res=docTypeSearch(t);
+  if(res.length)return {code:res[0][0],label:res[0][1]};
+  return null;
+}
+// Miejsce wydania dokumentu: comune włoska ALBO kraj. Zwraca null jeśli
+// nierozpoznane (nigdy nie zgaduje).
+function resolveDocPlaceMatch(text){
+  if(!text)return null;
+  var c=resolveComuneMatch(text);
+  if(c)return {type:"comune",code:c.code,name:c.name};
+  var normed=normC(text);
+  if(COUNTRY_LIST.indexOf(normed)>-1)return {type:"stato",code:getNC(normed),name:normed};
+  return null;
+}
+
+// ── Kompletuje wszystkie pola dokumentowe/comune na gotowym obiekcie
+// gościa — wywoływane identycznie z KAŻDEJ ścieżki tworzenia gościa. ──
+function finalizeGuestDocFields(g,hints){
+  hints=hints||{};
+  var birthCtry=g.birthC||g.cit;
+  var bornIT=isIT(birthCtry);
+  if(bornIT&&hints.birthPlaceName){
+    var bm=resolveComuneMatch(hints.birthPlaceName);
+    if(bm){g.birthComuneCode=bm.code;g.birthComuneProv=bm.prov;}
+  }
+  var residCtry=g.residC||g.cit;
+  var residIT=isIT(residCtry);
+  if(residIT&&hints.residencePlaceName){
+    var rm=resolveComuneMatch(hints.residencePlaceName);
+    if(rm){g.residComuneCode=rm.code;g.residComuneProv=rm.prov;}
+  }
+  if(hints.docType){
+    var dt=resolveDocTypeMatch(hints.docType);
+    g.docType=dt?dt.code:""; // nierozpoznany typ -> puste, NIGDY surowy tekst
+  }
+  // Typ dokumentu jest OBOWIĄZKOWY dla lidera — puste pole odrzuca plik
+  // dokładnie tak samo pewnie jak zły kod. Jeśli mamy numer dokumentu, ale
+  // sam typ się nie rozpoznał (nietypowa nazwa, literówka AI itp.),
+  // bezpieczny domyślny wybór to "dowód osobisty" — najbardziej
+  // uniwersalny, generyczny kod — zamiast zostawiać wymagane pole puste.
+  // Jeśli nie ma nawet numeru dokumentu, nic nie zgadujemy.
+  if(g.isLeader&&!g.docType&&g.docNumber){
+    g.docType="CARTA D'IDENTITA";
+  }
+  if(hints.docIssuePlaceName){
+    var dp=resolveDocPlaceMatch(hints.docIssuePlaceName);
+    if(dp)g.docIssuePlace={type:dp.type,code:dp.code};
+  }
+  // Domyślne miejsce wydania dla lidera, jeśli nic konkretnego nie ustalono:
+  // dokument narodowy (dowód/paszport) prawie zawsze wydaje kraj obywatelstwa.
+  if(g.isLeader&&!g.docIssuePlace&&g.cit){
+    var citCode=getNC(g.cit);
+    if(citCode)g.docIssuePlace={type:"stato",code:citCode};
+  }
+  return g;
+}
+
+function fillComuneNascFromHintInto(inp,name){
+  delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
+  if(!name){inp.value="";return;}
+  var m=resolveComuneMatch(name);
+  if(m){inp.value=m.name;inp.dataset.code=m.code;inp.dataset.prov=m.prov;return;}
   inp.value=name; // AI podpowiedziało nazwę, ale trzeba potwierdzić z listy poniżej
 }
 
@@ -925,19 +1008,8 @@ function fillDocPlaceFromHint(name){fillDocPlaceFromHintInto(document.getElement
 function fillDocPlaceFromHintInto(inp,name){
   delete inp.dataset.code;delete inp.dataset.prov;delete inp.dataset.type;
   if(!name){inp.value="";return;}
-  var q=String(name).trim().toUpperCase();
-  var exactC=COMUNI_DATA.filter(function(r){return r[1]===q;});
-  exactC.sort(function(a,b){return a[3]-b[3];});
-  if(exactC.length){inp.value=exactC[0][1];inp.dataset.code=exactC[0][0];inp.dataset.prov=exactC[0][2];inp.dataset.type="comune";return;}
-  // "MC GE" itp. (prawo jazdy — Motorizzazione Civile + prowincja) -> stolica prowincji
-  var abbr=resolveMotorizzazioneAbbrev(q);
-  if(abbr){
-    var byName=COMUNI_DATA.filter(function(r){return r[1]===abbr.name&&r[2]===abbr.prov;});
-    byName.sort(function(a,b){return a[3]-b[3];});
-    if(byName.length){inp.value=byName[0][1];inp.dataset.code=byName[0][0];inp.dataset.prov=byName[0][2];inp.dataset.type="comune";return;}
-  }
-  var normed=normC(name);
-  if(COUNTRY_LIST.indexOf(normed)>-1){inp.value=normed;inp.dataset.code=getNC(normed);inp.dataset.type="stato";return;}
+  var m=resolveDocPlaceMatch(name);
+  if(m){inp.value=m.name;if(m.prov)inp.dataset.prov=m.prov;inp.dataset.code=m.code;inp.dataset.type=m.type;return;}
   inp.value=name; // trzeba potwierdzić/wybrać ręcznie z listy
 }
 
@@ -947,21 +1019,16 @@ function fillDocPlaceFromHintInto(inp,name){
 function fillDocTypeFromHint(text){
   var sel=document.getElementById("oDocType");
   if(!text){sel.value="";return;}
-  var known=Array.prototype.map.call(sel.options,function(o){return o.value;});
-  if(known.indexOf(text)>-1){sel.value=text;return;} // AI trafiło w jedną ze znanych wartości
-  var res=docTypeSearch(text);
-  if(res.length){
-    var code=res[0][0],name=res[0][1];
-    var existing=Array.prototype.find.call(sel.options,function(o){return o.value===code;});
-    if(!existing){var opt=document.createElement("option");opt.value=code;opt.textContent=name+" ("+code+")";sel.appendChild(opt);}
-    sel.value=code;
-  } else {
-    sel.value=""; // nierozpoznane — użytkownik wybierze ręcznie
-  }
+  var m=resolveDocTypeMatch(text);
+  if(!m){sel.value="";return;} // nierozpoznane — użytkownik wybierze ręcznie, NIGDY surowy tekst
+  var existing=Array.prototype.find.call(sel.options,function(o){return o.value===m.code;});
+  if(!existing){var opt=document.createElement("option");opt.value=m.code;opt.textContent=m.label+" ("+m.code+")";sel.appendChild(opt);}
+  sel.value=m.code;
 }
 attachComuneAutocomplete("oComuneNasc","oComuneNascList","comune");
 attachComuneAutocomplete("oComuneResid","oComuneResidList","comune");
 attachComuneAutocomplete("oDocPlace","oDocPlaceList","mixed");
+
 
 // ── Wyszukiwarka "Inny dokument" — pełna lista 95 oficjalnych typów ──
 document.getElementById("btnDocTypeOther").addEventListener("click",function(){
@@ -1343,10 +1410,13 @@ function parseNumberedMultilineFormat(allLines, sharedNat, gtype){
     var birthN=normC(countries[1]||cit)||citN;
     var residN=normC(countries[2]||cit)||citN;
     var isLeader=(bi===0);
-    guests.push({id:uid(),firstName:sanName(fn),lastName:sanName(ln),rawFirst:fn,rawLast:ln,
+    var g={id:uid(),firstName:sanName(fn),lastName:sanName(ln),rawFirst:fn,rawLast:ln,
       gender:gender,dob:dob,cit:citN,birthC:birthN,residC:residN,isItaly:isIT(cit),
-      isLeader:isLeader,gtype:gtype,docType:docType,docNumber:docNumber,
-      role:isLeader?"Capogruppo":"Membro"});
+      isLeader:isLeader,gtype:gtype,docType:"",docNumber:docNumber,
+      birthComuneCode:"",birthComuneProv:"",residComuneCode:"",residComuneProv:"",docIssuePlace:null,
+      role:isLeader?"Capogruppo":"Membro"};
+    finalizeGuestDocFields(g,{docType:docType});
+    guests.push(g);
   });
 }
 
@@ -1373,7 +1443,8 @@ function txRunHeuristic(text,gtype){
         if(!p.fn && !p.ln) continue;
         var citN = sharedNat || normC(normNatWord(p.cit)) || "";
         var isFirst = (guests.length===0);
-        guests.push({id:uid(),firstName:sanName(p.fn),lastName:sanName(p.ln),rawFirst:p.fn,rawLast:p.ln,gender:p.gender,dob:p.dob,cit:citN,birthC:citN,residC:citN,isItaly:isIT(citN||p.cit),isLeader:isFirst,gtype:gtype,docType:"",docNumber:"",role:isFirst?"Capogruppo":"Membro"});
+        guests.push({id:uid(),firstName:sanName(p.fn),lastName:sanName(p.ln),rawFirst:p.fn,rawLast:p.ln,gender:p.gender,dob:p.dob,cit:citN,birthC:citN,residC:citN,isItaly:isIT(citN||p.cit),isLeader:isFirst,gtype:gtype,docType:"",docNumber:"",birthComuneCode:"",birthComuneProv:"",residComuneCode:"",residComuneProv:"",docIssuePlace:null,role:isFirst?"Capogruppo":"Membro"});
+        finalizeGuestDocFields(guests[guests.length-1],{});
       }
     } else {
       var blocks=text.split(/\n[ \t]*\n+/).map(function(b){return b.trim();}).filter(Boolean);
@@ -1415,8 +1486,8 @@ function txRunAI(text,gtype,onDone){
   if(!apiKey){ txRunHeuristic(text,gtype); onDone(); return; }
   txSetStatus("🤖 Analizuję inteligentnie...");
   var prompt="Extract every guest from this raw, possibly messy pasted text (may be numbered, wrapped inconsistently across lines, in any language, any order of fields). Return ONLY a raw JSON array, no markdown, no extra text. One element per distinct person, preserve original order, never skip a person even if some fields are missing:\n"+
-    "{\"firstName\":\"given name(s)\",\"lastName\":\"surname\",\"gender\":\"M or F or empty string\",\"dateOfBirth\":\"DD/MM/YYYY or empty string\",\"nationality\":\"standard English country name (e.g. Poland, Germany, Italy), empty if unknown\",\"birthCountry\":\"empty string if same as nationality\",\"residenceCountry\":\"empty string if same as nationality\",\"docType\":\"PASSAPORTO, CARTA D'IDENTITA, IDELE, PATENTE, PASDI, PASSE, or the exact Italian document type name as printed if none of these match, or empty string if unknown\",\"docNumber\":\"exact document/ID number if present, else empty string\",\"isLeader\":true only for the group leader/first person if the text marks one, otherwise false}\n"+
-    "Never invent data that isn't in the text — leave fields empty instead of guessing. Numbering prefixes like \"1:\" or \"2.\" are NOT part of the name — strip them. Replace ALL hyphens in names with a space (e.g. \"Kowalska-Nowak\" -> \"Kowalska Nowak\").\n\nTEXT:\n"+text.slice(0,10000);
+    "{\"firstName\":\"given name(s)\",\"lastName\":\"surname\",\"gender\":\"M or F or empty string\",\"dateOfBirth\":\"DD/MM/YYYY or empty string\",\"nationality\":\"standard English country name (e.g. Poland, Germany, Italy), empty if unknown\",\"birthCountry\":\"empty string if same as nationality\",\"birthPlaceName\":\"the specific town/comune of birth if the text names one, else empty string\",\"residenceCountry\":\"empty string if same as nationality\",\"residencePlaceName\":\"the specific Italian comune of residence ONLY if the text explicitly says the person lives in that Italian town — leave empty for any non-Italian address or if not stated\",\"docType\":\"PASSAPORTO, CARTA D'IDENTITA, IDELE, PATENTE, PASDI, PASSE, RIFUG, or the exact Italian document type name as printed if none of these match. A foreign national ID card (Spanish DNI, German Personalausweis, French CNI, etc) is functionally the same document as CARTA D'IDENTITA (a national identity card) regardless of issuing country - classify it as CARTA D'IDENTITA, do not leave it empty. A foreign national driving licence is PATENTE. Only leave this empty if the text genuinely does not indicate any document type at all\",\"docNumber\":\"exact document/ID number if present, else empty string\",\"docIssuePlaceName\":\"place/authority that issued the document if explicitly stated in the text, else empty string\",\"isLeader\":true only for the group leader/first person if the text marks one, otherwise false}\n"+
+    "Never invent data that isn't in the text — leave fields empty instead of guessing. Numbering prefixes like \"1:\" or \"2.\" are NOT part of the name — strip them. Replace ALL hyphens in names with a space (e.g. \"Kowalska-Nowak\" -> \"Kowalska Nowak\"). For docType specifically: if the text uses a foreign label for a national ID card (e.g. Spanish \"DNI\", German \"Personalausweis\") this means CARTA D'IDENTITA equivalent — but since it is a foreign document, just leave docType empty rather than inventing a code, UNLESS the text is describing an actual Italian document.\n\nTEXT:\n"+text.slice(0,10000);
   fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key="+apiKey,{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:4000,temperature:0}})
@@ -1436,12 +1507,20 @@ function txRunAI(text,gtype,onDone){
       var birthN=p.birthCountry?normC(normNatWord(p.birthCountry)):citN;
       var residN=p.residenceCountry?normC(normNatWord(p.residenceCountry)):citN;
       var isLeader=!!p.isLeader||(i===0&&!persons.some(function(x){return x.isLeader;}));
-      guests.push({id:uid(),firstName:sanName(p.firstName||""),lastName:sanName(p.lastName||""),
+      var g={id:uid(),firstName:sanName(p.firstName||""),lastName:sanName(p.lastName||""),
         rawFirst:p.firstName||"",rawLast:p.lastName||"",
         gender:(p.gender==="M"||p.gender==="F")?p.gender:null,dob:p.dateOfBirth||"",
         cit:citN,birthC:birthN,residC:residN,isItaly:isIT(citN),
-        isLeader:isLeader,gtype:gtype,docType:p.docType||"",docNumber:san(p.docNumber||""),
-        role:isLeader?"Capogruppo":"Membro"});
+        isLeader:isLeader,gtype:gtype,docType:"",docNumber:san(p.docNumber||""),
+        birthComuneCode:"",birthComuneProv:"",residComuneCode:"",residComuneProv:"",docIssuePlace:null,
+        role:isLeader?"Capogruppo":"Membro"};
+      finalizeGuestDocFields(g,{
+        birthPlaceName:p.birthPlaceName||"",
+        residencePlaceName:p.residencePlaceName||"",
+        docType:p.docType||"",
+        docIssuePlaceName:p.docIssuePlaceName||""
+      });
+      guests.push(g);
     });
     txSetStatus("");
     onDone();
@@ -1696,6 +1775,13 @@ function applyOcr(guestId){
     residComuneProv:comuneResidInp.dataset.prov||"",
     docIssuePlace:docPlaceInp.dataset.code?{type:docPlaceInp.dataset.type||"stato",code:docPlaceInp.dataset.code}:null
   };
+  // Domyślne miejsce wydania dla lidera, jeśli nic konkretnego nie ustalono
+  // (ta sama reguła co finalizeGuestDocFields — dokument narodowy prawie
+  // zawsze wydaje kraj obywatelstwa).
+  if(isLeaderVal&&!up.docIssuePlace&&up.cit){
+    var citCode=getNC(up.cit);
+    if(citCode)up.docIssuePlace={type:"stato",code:citCode};
+  }
   
   if(targetId){
     for(var i=0;i<guests.length;i++){if(guests[i].id===targetId){Object.assign(guests[i],up);break;}}
@@ -1930,9 +2016,11 @@ function genTXT(){
     var statoResid=pp(getNC(residCtry),9,true);       // pole 13 — zawsze wymagane
     // Pole 17: Luogo o Stato rilascio documento — JEDNO pole (9 cyfr), kod
     // gminy (jeśli wydany we Włoszech) albo kod kraju — nie obywatelstwo.
+    // Fallback: jeśli nic nie ustalono, dokument narodowy prawie zawsze
+    // wydaje kraj obywatelstwa (ta sama reguła co w genQuestura()).
     var luogoRilascio;
     if(g.docIssuePlace&&g.docIssuePlace.code)luogoRilascio=pp(g.docIssuePlace.code,9,true);
-    else luogoRilascio=pp("",9);
+    else luogoRilascio=pp(getNC(g.cit),9,true);
     return pp(t,2)+pp(arr,10)+pp(san(g.lastName),50)+pp(san(g.firstName),30)+(g.gender==="F"?"2":"1")+pp(g.dob,10)
       +comuneNasc+provNasc+statoNasc+statoCit+comuneResid+provResid+statoResid+pp("",50)
       +(head?pp(DC[g.docType]||g.docType||"",5):pp("",5))
