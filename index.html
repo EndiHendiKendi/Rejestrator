@@ -550,7 +550,10 @@ select.inp{cursor:pointer;}
 <div class="screen" id="s-rozliczenie">
   <div class="topbar">
     <div><div class="topbar-title">Rozliczenie</div><div class="topbar-sub" id="rzYear"></div></div>
-    <button id="btnRzReset" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;">Reset roku</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="rzStatsOpenView()" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;">📊 Statystyki</button>
+      <button id="btnRzReset" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:10px;padding:6px 12px;font-size:12px;cursor:pointer;">Reset roku</button>
+    </div>
   </div>
   <div class="card-gold" style="margin-top:8px;">
     <div style="font-size:11px;color:rgba(201,169,110,.6);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Saldo bieżące roku</div>
@@ -571,6 +574,8 @@ select.inp{cursor:pointer;}
     <label class="field-lbl">Basen — godziny (12€/h) + edytowalna kwota</label>
     <div style="display:flex;gap:8px;align-items:center;"><input type="number" id="rz-poolH" class="inp" placeholder="0h" min="0" step="0.5" style="flex:1;font-size:18px;font-weight:700;color:var(--blue);"/><span style="color:var(--text3);">=</span><div style="position:relative;flex:1;"><input type="number" id="rz-poolC" class="inp" placeholder="auto" min="0" style="font-size:18px;font-weight:700;color:var(--gold2);padding-right:22px;" data-m="0"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">€</span></div></div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px;">Godziny wyliczają auto — prawa kwota edytowalna ręcznie</div>
+    <label class="field-lbl" style="margin-top:14px;">Premia <span style="color:var(--text3);font-weight:400;">(opcjonalnie)</span></label>
+    <div style="position:relative;"><input type="number" id="rz-premia" class="inp" placeholder="0" min="0" step="1" style="font-size:18px;font-weight:700;color:#a78bfa;padding-right:22px;"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">€</span></div>
   </div>
   <div class="section-lbl">Inne pozycje (+/-)</div>
   <div class="card"><div id="rz-extraList"></div><div style="display:flex;gap:8px;"><input type="text" id="rz-eName" class="inp" placeholder="Opis (np. Maurizio)" style="flex:2;font-size:14px;"/><input type="number" id="rz-eAmt" class="inp" placeholder="€" style="flex:1;font-size:14px;"/><select id="rz-eSign" class="inp" style="flex:1;font-size:14px;padding:13px 6px;"><option value="1">+</option><option value="-1">-</option></select></div><button id="btnRzAddExtra" class="btn btn-secondary" style="margin-top:8px;font-size:13px;">+ Dodaj pozycję</button></div>
@@ -620,6 +625,33 @@ select.inp{cursor:pointer;}
     <div style="font-size:12.5px;color:var(--text3);margin-bottom:16px;">Tylko realne, potwierdzone pobyty — bez anulowanych, zablokowanych i zdublowanych terminów.</div>
     <div id="rezStatsYears" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;"></div>
     <div id="rezStatsBody"></div>
+  </div>
+</div>
+
+<div id="overlayRzStats" style="display:none;position:fixed;inset:0;z-index:450;background:#0a0a0f;overflow-y:auto;">
+  <div class="topbar" style="position:sticky;top:0;background:#0a0a0f;z-index:2;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button onclick="rzStatsCloseView()" style="background:transparent;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:4px 6px 4px 0;line-height:1;">←</button>
+      <div><div class="topbar-title">📊 Statystyki rozliczeń</div><div class="topbar-sub" id="rzStatsYearLabel"></div></div>
+    </div>
+  </div>
+  <div style="padding:16px 20px 40px;">
+    <div style="font-size:12.5px;color:var(--text3);margin-bottom:16px;">Tylko sprzątanie, basen i premie — pozycje "Inne" celowo nie są tu liczone.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card-gold" style="padding:16px;">
+        <div style="font-size:11px;color:rgba(201,169,110,.6);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sprzątanie — łącznie</div>
+        <div id="rzStatCleaning" style="font-size:26px;font-weight:700;color:var(--gold2);">0 €</div>
+        <div id="rzStatCleaningCount" style="font-size:12px;color:var(--text3);margin-top:2px;"></div>
+      </div>
+      <div class="card-gold" style="padding:16px;">
+        <div style="font-size:11px;color:rgba(96,165,250,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Basen — łącznie</div>
+        <div id="rzStatBasen" style="font-size:26px;font-weight:700;color:var(--blue);">0 €</div>
+      </div>
+      <div class="card-gold" style="padding:16px;">
+        <div style="font-size:11px;color:rgba(167,139,250,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Premie — łącznie</div>
+        <div id="rzStatPremia" style="font-size:26px;font-weight:700;color:#a78bfa;">0 €</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1144,7 +1176,28 @@ var STRUCT={code:"L10046",reg:"011013-LT-0079",camDisp:"1",lettiDisp:"12"};
 var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje","karty"];
 // Historia nawigacji — przycisk wstecz nie wyrzuca z apki
 // Overlay IDs które mogą być otwarte i powinny być zamknięte przez "wstecz"
-var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayAppModal"];
+var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayAppModal","overlayRzStats"];
+
+function rzStatsOpenView(){
+  var data=rzLoad();
+  var year=new Date().getFullYear();
+  document.getElementById("rzStatsYearLabel").textContent="Rok "+year;
+  var tot={cleaning:0,basen:0,premia:0};
+  var cleaningCount=0;
+  data.entries.forEach(function(e){
+    if(!e.cat)return; // starsze wpisy sprzed tej funkcji nie mają kategorii — pomijamy, nie zgadujemy
+    tot.cleaning+=e.cat.cleaning||0;
+    tot.basen+=e.cat.basen||0;
+    tot.premia+=e.cat.premia||0;
+    if(e.cat.cleaning>0)cleaningCount++;
+  });
+  document.getElementById("rzStatCleaning").textContent=r2(tot.cleaning)+" €";
+  document.getElementById("rzStatCleaningCount").textContent=cleaningCount+" rezerwacji × 150€";
+  document.getElementById("rzStatBasen").textContent=r2(tot.basen)+" €";
+  document.getElementById("rzStatPremia").textContent=r2(tot.premia)+" €";
+  document.getElementById("overlayRzStats").style.display="block";
+}
+function rzStatsCloseView(){document.getElementById("overlayRzStats").style.display="none";}
 
 // ── System okienek w stylu apki — zamiennik natywnych alert()/confirm(),
 // które w przeglądarce pokazują brzydki "Komunikat ze strony ...". ──
@@ -2298,12 +2351,13 @@ document.getElementById("btnRzAddExtra").addEventListener("click",function(){
 
 function r2(x){return Math.round((x+Number.EPSILON)*100)/100;}
 
-function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
+function rzBuildLines(groups,extras,cleaning,ph,usePC,pca,premia){
   var lines=[],p="\u200B👤";
   groups.forEach(function(gr){
     lines.push(p+" *"+gr.name+"*");
     if(cleaning)lines.push("- + "+150+"\u20AC (sprz\u0105tanie)");
     if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);if(pa>0)lines.push("- +   "+pa+"\u20AC (basen)");}
+    if(premia>0)lines.push("- +   "+premia+"\u20AC (premia)");
   });
   // Extras — zawsze jako jeden blok "Inne" na końcu (nie per grupa)
   if(extras.length){
@@ -2316,15 +2370,30 @@ function rzBuildLines(groups,extras,cleaning,ph,usePC,pca){
   return lines;
 }
 
-function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca){
+function rzCalcDelta(groups,extras,cleaning,ph,usePC,pca,premia){
   var s=0;
   groups.forEach(function(gr){
     if(cleaning)s+=150;
     if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);s+=pa;}
+    if(premia>0)s+=premia;
   });
   // Extras — jeden raz, nie per grupa
   extras.forEach(function(ex){s+=ex.sign>0?ex.amt:-ex.amt;});
   return s;
+}
+
+// ── Kategorie wpisu do statystyk — zapisywane WPROST na wpisie w momencie
+// zatwierdzenia (nie odczytywane później z tekstu linii), żeby statystyki
+// były w 100% niezawodne niezależnie od tego jak wygląda opis. "Inne"
+// świadomie NIE jest tu liczone — inny temat, użytkownik tego nie chce.
+function rzCalcCategoryTotals(groups,cleaning,ph,usePC,pca,premia){
+  var cat={cleaning:0,basen:0,premia:0};
+  groups.forEach(function(gr){
+    if(cleaning)cat.cleaning+=150;
+    if(ph>0||usePC){var pa=usePC?pca:Math.round(ph*12);cat.basen+=pa;}
+    if(premia>0)cat.premia+=premia;
+  });
+  return cat;
 }
 
 function rzDeleteEntry(i){
@@ -2360,19 +2429,33 @@ function rzRefreshHistory(){
   header.style.cssText="font-weight:700;color:var(--gold2);margin-bottom:10px;font-size:13px;";
   header.textContent="*Rozliczenie "+year+":*";
   hist.appendChild(header);
+  // Dla przejrzystości pokazujemy TYLKO ostatnie wpisy (max 4), zamiast
+  // całego, narastającego przez sezon ciągu — w większości przypadków
+  // wyjdą 2-3 (ostatni gość + bieżący, ewentualnie stary/nowy blok "Inne").
+  // Pełne dane (do salda i statystyk) i tak zostają nietknięte.
+  var VISIBLE_COUNT=4;
+  var startIdx=Math.max(0,data.entries.length-VISIBLE_COUNT);
+  if(startIdx>0){
+    var hiddenNote=document.createElement("div");
+    hiddenNote.style.cssText="font-size:11.5px;color:var(--text3);margin-bottom:10px;";
+    hiddenNote.textContent="… "+startIdx+" wcześniejszych wpisów ukrytych dla przejrzystości (liczą się do salda i statystyk) — zobacz 📊 Statystyki rozliczeń";
+    hist.appendChild(hiddenNote);
+  }
   function isInneOnly(entry){
     var ll=entry.lines;
     return ll.length>0&&ll[0].indexOf("*Inne*")>=0&&
       !ll.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
   }
-  data.entries.forEach(function(e,i){
+  for(var i=startIdx;i<data.entries.length;i++){
+    (function(i){
+    var e=data.entries[i];
     var block=document.createElement("div");
     var linesCopy=e.lines.slice();
     var thisInne=isInneOnly(e);
     var prevInne=i>0&&isInneOnly(data.entries[i-1]);
     var nextInne=i<data.entries.length-1&&isInneOnly(data.entries[i+1]);
 
-    if(thisInne&&prevInne){
+    if(thisInne&&prevInne&&i>startIdx){
       // Kontynuacja bloku Inne — usuń nagłówek, połącz wizualnie z poprzednim (brak margin-top)
       linesCopy=linesCopy.filter(function(l){return l.indexOf("*Inne*")<0;});
       block.style.cssText="margin-bottom:12px;margin-top:-10px;padding:0 12px 10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 10px 10px;position:relative;";
@@ -2396,7 +2479,8 @@ function rzRefreshHistory(){
     block.appendChild(txt);
     block.appendChild(del);
     hist.appendChild(block);
-  });
+    })(i);
+  }
   var wrap=hist.parentElement;if(wrap)wrap.scrollTop=wrap.scrollHeight;
 }
 
@@ -2405,7 +2489,8 @@ function rzCommit(){
   var ph=parseFloat(document.getElementById("rz-poolH").value)||0;
   var pcEl=document.getElementById("rz-poolC");
   var pca=parseFloat(pcEl.value);var usePC=!isNaN(pca)&&pcEl.dataset.m==="1";
-  var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca);
+  var premia=parseFloat(document.getElementById("rz-premia").value)||0;
+  var lines=rzBuildLines(rzGroups,rzExtras,cleaning,ph,usePC,pca,premia);
   if(!lines.length){appAlert("Dodaj grupy gości lub inne pozycje");return false;}
   var data=rzLoad();
 
@@ -2416,14 +2501,15 @@ function rzCommit(){
   // sąsiadujące wpisy "tylko Inne" wizualnie pod spodem, więc efekt jest
   // czytelny: karta gościa, a pod nią doklejone "Inne".
   if(rzGroups.length){
-    var groupLines=rzBuildLines(rzGroups,[],cleaning,ph,usePC,pca);
-    var groupDelta=rzCalcDelta(rzGroups,[],cleaning,ph,usePC,pca);
+    var groupLines=rzBuildLines(rzGroups,[],cleaning,ph,usePC,pca,premia);
+    var groupDelta=rzCalcDelta(rzGroups,[],cleaning,ph,usePC,pca,premia);
+    var cat=rzCalcCategoryTotals(rzGroups,cleaning,ph,usePC,pca,premia);
     data.saldo=r2(data.saldo+groupDelta);
-    data.entries.push({lines:groupLines,saltoAfter:data.saldo,ts:Date.now()});
+    data.entries.push({lines:groupLines,saltoAfter:data.saldo,ts:Date.now(),cat:cat});
   }
   if(rzExtras.length){
-    var extraLines=rzBuildLines([],rzExtras,false,0,false,0);
-    var extraDelta=rzCalcDelta([],rzExtras,false,0,false,0);
+    var extraLines=rzBuildLines([],rzExtras,false,0,false,0,0);
+    var extraDelta=rzCalcDelta([],rzExtras,false,0,false,0,0);
     data.saldo=r2(data.saldo+extraDelta);
     data.entries.push({lines:extraLines,saltoAfter:data.saldo,ts:Date.now()});
   }
@@ -2436,6 +2522,7 @@ function rzCommit(){
   rzGroups=[];rzExtras=[];
   document.getElementById("rz-poolH").value="";
   document.getElementById("rz-poolC").value="";pcEl.dataset.m="0";
+  document.getElementById("rz-premia").value="";
   document.getElementById("rz-cleaning").checked=true;
   document.getElementById("rz-cleaningTog").style.background="#c9a96e";
   rzRenderGroups();rzRenderExtras();rzRefreshHistory();
@@ -2487,6 +2574,7 @@ document.getElementById("btnRzReset").addEventListener("click",function(){
   appConfirm("Wyczyścić całe rozliczenie roku?",function(){
     localStorage.removeItem(RZ_KEY);rzGroups=[];rzExtras=[];
     document.getElementById("rz-poolH").value="";document.getElementById("rz-poolC").value="";
+    document.getElementById("rz-premia").value="";
     document.getElementById("rz-cleaning").checked=true;
     document.getElementById("rz-cleaningTog").style.background="#c9a96e";
     rzRenderGroups();rzRenderExtras();rzRefreshHistory();
