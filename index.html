@@ -1178,6 +1178,20 @@ var SCREENS=["dane","skan","lista","eksport","rozliczenie","rezerwacje","karty"]
 // Overlay IDs które mogą być otwarte i powinny być zamknięte przez "wstecz"
 var OVERLAY_IDS=["overlayKarta","overlayKartyAdd","overlayOcr","overlayWaste","overlaySettings","overlayFirstRun","overlayRezStats","overlayAppModal","overlayRzStats"];
 
+// ── Dla wpisów sprzed wprowadzenia kategorii (pole "cat") odczytujemy je
+// wstecznie wprost z tekstu linii — format jest zawsze taki sam (apka sama
+// go generuje), więc to niezawodne, nie zgadywanie. Dzięki temu statystyki
+// działają też dla wcześniej wpisanych rozliczeń, nie tylko nowych.
+function parseCategoryFromLines(lines){
+  var cat={cleaning:0,basen:0,premia:0};
+  (lines||[]).forEach(function(l){
+    var m;
+    if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(sprz\u0105tanie\)/)))cat.cleaning+=parseFloat(m[1].replace(",","."));
+    else if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(basen\)/)))cat.basen+=parseFloat(m[1].replace(",","."));
+    else if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(premia\)/)))cat.premia+=parseFloat(m[1].replace(",","."));
+  });
+  return cat;
+}
 function rzStatsOpenView(){
   var data=rzLoad();
   var year=new Date().getFullYear();
@@ -1185,11 +1199,11 @@ function rzStatsOpenView(){
   var tot={cleaning:0,basen:0,premia:0};
   var cleaningCount=0;
   data.entries.forEach(function(e){
-    if(!e.cat)return; // starsze wpisy sprzed tej funkcji nie mają kategorii — pomijamy, nie zgadujemy
-    tot.cleaning+=e.cat.cleaning||0;
-    tot.basen+=e.cat.basen||0;
-    tot.premia+=e.cat.premia||0;
-    if(e.cat.cleaning>0)cleaningCount++;
+    var cat=e.cat||parseCategoryFromLines(e.lines);
+    tot.cleaning+=cat.cleaning||0;
+    tot.basen+=cat.basen||0;
+    tot.premia+=cat.premia||0;
+    if(cat.cleaning>0)cleaningCount++;
   });
   document.getElementById("rzStatCleaning").textContent=r2(tot.cleaning)+" €";
   document.getElementById("rzStatCleaningCount").textContent=cleaningCount+" rezerwacji × 150€";
@@ -2429,25 +2443,32 @@ function rzRefreshHistory(){
   header.style.cssText="font-weight:700;color:var(--gold2);margin-bottom:10px;font-size:13px;";
   header.textContent="*Rozliczenie "+year+":*";
   hist.appendChild(header);
-  // Dla przejrzystości pokazujemy TYLKO ostatnie wpisy (max 4), zamiast
-  // całego, narastającego przez sezon ciągu — w większości przypadków
-  // wyjdą 2-3 (ostatni gość + bieżący, ewentualnie stary/nowy blok "Inne").
-  // Pełne dane (do salda i statystyk) i tak zostają nietknięte.
-  var VISIBLE_COUNT=4;
-  var startIdx=Math.max(0,data.entries.length-VISIBLE_COUNT);
-  if(startIdx>0){
-    var hiddenNote=document.createElement("div");
-    hiddenNote.style.cssText="font-size:11.5px;color:var(--text3);margin-bottom:10px;";
-    hiddenNote.textContent="… "+startIdx+" wcześniejszych wpisów ukrytych dla przejrzystości (liczą się do salda i statystyk) — zobacz 📊 Statystyki rozliczeń";
-    hist.appendChild(hiddenNote);
-  }
   function isInneOnly(entry){
     var ll=entry.lines;
     return ll.length>0&&ll[0].indexOf("*Inne*")>=0&&
       !ll.some(function(l){return l.indexOf("*")>=0&&l.indexOf("*Inne*")<0;});
   }
-  for(var i=startIdx;i<data.entries.length;i++){
-    (function(i){
+  // Dla przejrzystości pokazujemy TYLKO ostatnie wpisy — max 2 gości
+  // (ostatni + bieżący) ORAZ osobno max 2 "Inne" (stary + bieżący), a nie
+  // "ostatnie 4 z rzędu" — bo to potrafiło pokazać 3 gości naraz, jeśli
+  // akurat nie było świeżego wpisu "Inne" pomiędzy nimi. Pełne dane (do
+  // salda i statystyk) i tak zostają nietknięte, liczą się wszystkie.
+  var guestIdxs=[],inneIdxs=[];
+  for(var gi=0;gi<data.entries.length;gi++){
+    if(isInneOnly(data.entries[gi]))inneIdxs.push(gi);else guestIdxs.push(gi);
+  }
+  var visibleSet={};
+  guestIdxs.slice(-2).forEach(function(idx){visibleSet[idx]=true;});
+  inneIdxs.slice(-2).forEach(function(idx){visibleSet[idx]=true;});
+  var visibleIdxs=Object.keys(visibleSet).map(Number).sort(function(a,b){return a-b;});
+  var hiddenCount=data.entries.length-visibleIdxs.length;
+  if(hiddenCount>0){
+    var hiddenNote=document.createElement("div");
+    hiddenNote.style.cssText="font-size:11.5px;color:var(--text3);margin-bottom:10px;";
+    hiddenNote.textContent="… "+hiddenCount+" wcześniejszych wpisów ukrytych dla przejrzystości (liczą się do salda i statystyk) — zobacz 📊 Statystyki rozliczeń";
+    hist.appendChild(hiddenNote);
+  }
+  visibleIdxs.forEach(function(i,vi){
     var e=data.entries[i];
     var block=document.createElement("div");
     var linesCopy=e.lines.slice();
@@ -2455,7 +2476,7 @@ function rzRefreshHistory(){
     var prevInne=i>0&&isInneOnly(data.entries[i-1]);
     var nextInne=i<data.entries.length-1&&isInneOnly(data.entries[i+1]);
 
-    if(thisInne&&prevInne&&i>startIdx){
+    if(thisInne&&prevInne&&vi>0){
       // Kontynuacja bloku Inne — usuń nagłówek, połącz wizualnie z poprzednim (brak margin-top)
       linesCopy=linesCopy.filter(function(l){return l.indexOf("*Inne*")<0;});
       block.style.cssText="margin-bottom:12px;margin-top:-10px;padding:0 12px 10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 10px 10px;position:relative;";
@@ -2479,8 +2500,7 @@ function rzRefreshHistory(){
     block.appendChild(txt);
     block.appendChild(del);
     hist.appendChild(block);
-    })(i);
-  }
+  });
   var wrap=hist.parentElement;if(wrap)wrap.scrollTop=wrap.scrollHeight;
 }
 
