@@ -1188,7 +1188,7 @@ function parseCategoryFromLines(lines){
     var m;
     if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(\s*sprz\u0105tanie/i)))cat.cleaning+=parseFloat(m[1].replace(",","."));
     else if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(\s*basen/i)))cat.basen+=parseFloat(m[1].replace(",","."));
-    else if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\(\s*premia\s*\)/i)))cat.premia+=parseFloat(m[1].replace(",","."));
+    else if((m=l.match(/\+\s*(\d+(?:[.,]\d+)?)\s*€\s*\([^)]*premia[^)]*\)/i)))cat.premia+=parseFloat(m[1].replace(",","."));
   });
   return cat;
 }
