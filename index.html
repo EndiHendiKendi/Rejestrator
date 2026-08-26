@@ -651,6 +651,10 @@ select.inp{cursor:pointer;}
         <div style="font-size:11px;color:rgba(167,139,250,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Premie — łącznie</div>
         <div id="rzStatPremia" style="font-size:26px;font-weight:700;color:#a78bfa;">0 €</div>
       </div>
+      <div class="card-gold" style="padding:16px;border-color:rgba(201,169,110,.5);">
+        <div style="font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Łącznie (sprzątanie + basen + premie)</div>
+        <div id="rzStatTotal" style="font-size:30px;font-weight:800;color:#fff;">0 €</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1209,6 +1213,8 @@ function rzStatsOpenView(){
   document.getElementById("rzStatCleaningCount").textContent=cleaningCount+" rezerwacji × 150€";
   document.getElementById("rzStatBasen").textContent=r2(tot.basen)+" €";
   document.getElementById("rzStatPremia").textContent=r2(tot.premia)+" €";
+  document.getElementById("rzStatTotal").textContent=r2(tot.cleaning+tot.basen+tot.premia)+" €";
+  document.getElementById("rzStatTotal").textContent=r2(tot.cleaning+tot.basen+tot.premia)+" €";
   document.getElementById("overlayRzStats").style.display="block";
 }
 function rzStatsCloseView(){document.getElementById("overlayRzStats").style.display="none";}
